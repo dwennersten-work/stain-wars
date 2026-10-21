@@ -16,9 +16,11 @@ fi
 
 echo "== Getting the game =="
 if [ -d "$DIR/.git" ]; then git -C "$DIR" pull --ff-only; else git clone "$REPO" "$DIR"; fi
-cd "$DIR" && npm install --omit=dev
+cd "$DIR" && npm ci --omit=dev   # exact versions from package-lock.json
 
 echo "== Setting up service =="
+# The game runs as an unprivileged, sandboxed user: if it were ever hacked, the attacker is not root.
+id stainwars >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin stainwars
 cat > /etc/systemd/system/stainwars.service <<EOF
 [Unit]
 Description=Stain Wars game server
@@ -29,6 +31,13 @@ WorkingDirectory=$DIR
 ExecStart=$(command -v node) server.js
 Environment=PORT=80
 Restart=always
+User=stainwars
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

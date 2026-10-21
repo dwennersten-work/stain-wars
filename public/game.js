@@ -232,6 +232,8 @@ function flash(color) {
 // ---------- Network ----------
 socket.on('welcome', (m) => { myId = m.id; myName = m.name; Object.assign(me, m.spawn); $('myName').textContent = m.name; });
 socket.on('me', (m) => { money = m.money; tier = m.tier; kills = m.kills; updateHud(); if (inShop) renderShop(); });
+socket.on('setpos', (p) => Object.assign(me, p, { vy: 0 }));   // server rejected our move (lag or cheating)
+socket.on('full', () => alert('Stain Wars is full right now. Try again in a bit!'));
 socket.on('respawn', (p) => { Object.assign(me, p, { vy: 0 }); alive = true; hp = 100; $('dead').classList.add('hidden'); updateHud(); });
 socket.on('snap', (list) => {
   const seen = new Set();

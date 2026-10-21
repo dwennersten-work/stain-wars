@@ -7,6 +7,11 @@ const S = require('./public/shared.js');
 const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, 'public');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
+// Abuse limits. Per-IP is generous because a whole classroom shares one school IP (NAT).
+const MAX_HUMANS = 80, MAX_PER_IP = 40, MAX_MSGS_PER_SEC = 60;
+const JUMP_H = S.JUMP * S.JUMP / (2 * S.GRAVITY);   // legit max jump height
+const vec3 = (a) => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite);
+const ipCount = new Map();
 
 const players = new Map();   // id -> player
 const projectiles = new Map();
@@ -24,7 +29,8 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(PUB)) { res.writeHead(404); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream',
+      'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
     res.end(data);
   });
 });
@@ -63,14 +69,48 @@ function pickName(bot) {
 
 function newPlayer(bot, socket) {
   const p = { id: nextId++, name: pickName(bot), bot, socket, ...S.randomSpawn(), vy: 0, ry: 0,
-    hp: S.MAX_HP, tier: 0, money: 0, kills: 0, deaths: 0, dead: false, lastFire: [0, 0, 0], lastHit: 0 };
+    hp: S.MAX_HP, tier: 0, money: 0, kills: 0, deaths: 0, dead: false, lastFire: [0, 0, 0], lastHit: 0, msgs: 0, lastFix: 0 };
+  resetMove(p);
   players.set(p.id, p);
   return p;
 }
 
 function respawn(p) {
   Object.assign(p, S.randomSpawn(), { vy: 0, hp: S.MAX_HP, dead: false });
+  resetMove(p);
   if (p.socket) p.socket.emit('respawn', { x: p.x, y: p.y, z: p.z });
+}
+
+// ---------- Movement anti-cheat ----------
+// Clients simulate their own movement, but the server only accepts moves a legit client could make:
+// horizontal speed via a token bucket, a jump-height ceiling, and a max air time (stops low-gravity floating).
+function resetMove(p) {
+  Object.assign(p, { budget: 0, air: 0, peak: p.y + JUMP_H + 0.3, lastMove: Date.now(), ignoreUntil: Date.now() + 500 });
+}
+
+function clientMove(p, a) {
+  const now = Date.now();
+  if (p.dead || now < p.ignoreUntil || !Array.isArray(a) || a.length !== 4 || !a.every(Number.isFinite)) return;
+  const dt = Math.min(0.5, (now - p.lastMove) / 1000);
+  p.lastMove = now;
+  p.budget = Math.min(4, p.budget + dt * S.SPEED * 1.3);
+  const q = { x: a[0], y: a[1], z: a[2] };
+  const dx = q.x - p.x, dz = q.z - p.z, dist = Math.hypot(dx, dz);
+  if (dist > p.budget) { q.x = p.x + dx / dist * p.budget; q.z = p.z + dz / dist * p.budget; }
+  p.budget -= Math.min(dist, p.budget);
+  const g = S.resolve(q);   // no walking through boxes or out of the arena
+  if (q.y <= g + 0.05) { q.y = Math.max(q.y, g); p.air = 0; p.peak = g + JUMP_H + 0.3; }
+  else {
+    p.air += dt;
+    if (q.y > p.peak) q.y = p.peak;
+    if (p.air > 1.5) q.y = g;   // stays pinned until the client admits it landed
+  }
+  p.x = q.x; p.y = q.y; p.z = q.z; p.ry = a[3];
+  // Tell a cheating (or badly lagging) client where it really is.
+  if (Math.hypot(q.x - a[0], q.y - a[1], q.z - a[2]) > 0.5 && now - p.lastFix > 500) {
+    p.lastFix = now;
+    p.socket.emit('setpos', { x: p.x, y: p.y, z: p.z });
+  }
 }
 
 function sendMe(p) { if (p.socket) p.socket.emit('me', { money: p.money, tier: p.tier, kills: p.kills }); }
@@ -172,18 +212,27 @@ function stepBot(b, dt) {
 }
 
 // ---------- Sockets ----------
-const io = new Server(server);
+// Never trust anything a client sends: validate types/ranges in every handler.
+const io = new Server(server, { maxHttpBufferSize: 1e4 });
 io.on('connection', (socket) => {
+  const ip = socket.handshake.address, humans = [...players.values()].filter(p => !p.bot).length;
+  if (humans >= MAX_HUMANS || (ipCount.get(ip) || 0) >= MAX_PER_IP) { socket.emit('full'); return socket.disconnect(true); }
+  ipCount.set(ip, (ipCount.get(ip) || 0) + 1);
   const p = newPlayer(false, socket);
+  socket.use((_, next) => { if (++p.msgs > MAX_MSGS_PER_SEC) socket.disconnect(true); else next(); });
   socket.emit('welcome', { id: p.id, name: p.name, spawn: { x: p.x, y: p.y, z: p.z } });
   sendMe(p);
-  socket.on('pos', (a) => { if (!p.dead && Array.isArray(a)) [p.x, p.y, p.z, p.ry] = a.map(Number); });
-  socket.on('fire', (m) => m && fire(p, m.w, m.o, m.d));
+  socket.on('pos', (a) => clientMove(p, a));
+  socket.on('fire', (m) => { if (m && Number.isInteger(m.w) && vec3(m.o) && vec3(m.d)) fire(p, m.w, m.o, m.d); });
   socket.on('buy', (tier) => {
-    const o = S.OUTFITS[tier];
+    const o = Number.isInteger(tier) && S.OUTFITS[tier];
     if (o && tier > p.tier && p.money >= o.cost) { p.money -= o.cost; p.tier = tier; sendMe(p); }
   });
-  socket.on('disconnect', () => players.delete(p.id));
+  socket.on('disconnect', () => {
+    players.delete(p.id);
+    const n = ipCount.get(ip) - 1;
+    if (n > 0) ipCount.set(ip, n); else ipCount.delete(ip);
+  });
 });
 
 // ---------- Loops ----------
@@ -200,6 +249,7 @@ setInterval(() => {
     const r = (n) => Math.round(n * 100) / 100;
     io.emit('snap', [...players.values()].map(p => [p.id, r(p.x), r(p.y), r(p.z), r(p.ry), p.tier, Math.ceil(p.hp), p.dead ? 1 : 0]));
   }
+  if (tickN % 30 === 0) for (const p of players.values()) p.msgs = 0;   // per-second message budget
   if (tickN % 30 === 0) io.emit('board', [...players.values()].map(p => [p.id, p.name, p.tier, p.kills, p.money, p.bot ? 1 : 0]));
 }, TICK * 1000);
 
