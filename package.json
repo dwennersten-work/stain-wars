@@ -1,0 +1,12 @@
+{
+  "name": "stain-wars",
+  "version": "0.1.0",
+  "description": "Derpy multiplayer food-fight FPS for a classroom cloud-computing demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.1"
+  }
+}

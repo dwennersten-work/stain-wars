@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stain Wars</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
+</head>
+<body>
+  <div id="scope"><div class="bun top"></div><div class="dog"></div><div class="bun bottom"></div><div class="mustard">~~~~~~~~~</div></div>
+  <div id="flash"></div>
+  <div id="crosshair">+</div>
+  <div id="hitmark">✕</div>
+
+  <div id="killfeed"></div>
+  <div id="board"><h3>🏆 Leaderboard</h3><ol id="boardList"></ol></div>
+
+  <div id="hud">
+    <div id="hpWrap"><div id="hpBar"></div><span id="hpText">Cleanliness 100%</span></div>
+    <div id="stats"><span id="money">$0</span> · <span id="kills">0 stains</span></div>
+    <div id="outfit"></div>
+    <div id="weapons"></div>
+    <div class="hint">[B] Outfit Shop</div>
+  </div>
+
+  <div id="popup"></div>
+
+  <div id="start" class="overlay">
+    <div class="panel">
+      <h1>🍔 STAIN WARS 🌭</h1>
+      <p>You are <b id="myName">...</b></p>
+      <p class="small">Stain other players with condiments. Win money. Buy WILDER outfits.<br>Wilder outfit = more stain resistance = worth more money to defeat!<br>Get defeated and you drop one outfit tier.</p>
+      <table class="small controls">
+        <tr><td>Move / Jump</td><td>WASD / Space</td></tr>
+        <tr><td>Aim / Shoot</td><td>Mouse / Click</td></tr>
+        <tr><td>Weapons</td><td>1 2 3 or Q</td></tr>
+        <tr><td>Hotdog scope</td><td>Right-click or Shift (Ketchup)</td></tr>
+        <tr><td>Outfit shop</td><td>B</td></tr>
+      </table>
+      <button id="playBtn">CLICK TO PLAY</button>
+    </div>
+  </div>
+
+  <div id="shop" class="overlay hidden">
+    <div class="panel wide">
+      <h2>👗 Outfit Shop <span id="shopMoney"></span></h2>
+      <div id="shopList"></div>
+      <button id="shopClose">Back to the fight [B]</button>
+    </div>
+  </div>
+
+  <div id="dead" class="overlay hidden"><div class="panel"><h1>🤢 STAINED!</h1><p id="deadMsg"></p></div></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="shared.js"></script>
+  <script type="module" src="game.js"></script>
+</body>
+</html>
