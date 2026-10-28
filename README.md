@@ -1,6 +1,6 @@
 # 🍔 Stain Wars 🌭
 
-A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. Students join with a link and fight with mustard, hamburger grenades and a ketchup sniper (with a hotdog scope). Each win earns money for wilder, more stain-resistant outfits. Meanwhile, the teacher shows the VM working hard in `htop`.
+A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. Students join with a link and start with a mustard squirter, then spend their winnings on soda shotguns, spaghetti whips, hamburger grenades, pie launchers, a ketchup sniper (with a hotdog scope), whipped cream "flashbangs", and wilder, more stain-resistant outfits. Meanwhile, the teacher shows the VM working hard in `htop`.
 
 ## Install on a DigitalOcean droplet
 1. Create a droplet: **Ubuntu 24.04, Basic, Regular, $6/mo (1 vCPU / 1 GB)**. It costs about $0.009/hour, so delete it when class is done.
@@ -24,7 +24,7 @@ A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. 
 **Lesson idea:** start with no one connected and look at `htop`. Let students join and watch CPU go up. Then run `stainwars bots 50` and watch it climb more.
 
 ## Controls
-WASD + Space to move and jump · mouse to aim · click to shoot · 1/2/3 or Q to switch weapons · right-click or Shift for the hotdog scope · B for the outfit shop.
+WASD + Space to move and jump · mouse to aim · click to shoot · 1-6 or Q to switch weapons · right-click or Shift for the hotdog scope · G to throw a whipped cream bomb · B for the shop.
 
 ## Run locally
 ```bash

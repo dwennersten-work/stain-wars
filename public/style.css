@@ -17,6 +17,9 @@ button:disabled { background: #888; cursor: default; }
 #crosshair { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 28px; text-shadow: 0 0 3px #000; pointer-events: none; }
 #hitmark { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 34px; color: #ff2; opacity: 0; pointer-events: none; text-shadow: 0 0 4px #000; }
 #flash { position: fixed; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.4s; }
+#cream { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 5; background:
+  radial-gradient(circle at 30% 35%, #fff 0 18vmin, transparent 18.5vmin), radial-gradient(circle at 70% 60%, #fffdf2 0 22vmin, transparent 22.5vmin),
+  radial-gradient(circle at 50% 50%, #fff 0 30vmin, transparent 30.5vmin), #fff8e8; }
 
 #hud { position: fixed; left: 16px; bottom: 16px; text-shadow: 2px 2px 0 #000; }
 #hpWrap { position: relative; width: 260px; height: 28px; background: #400; border: 3px solid #000; border-radius: 10px; overflow: hidden; }
@@ -29,6 +32,8 @@ button:disabled { background: #888; cursor: default; }
 #weapons { margin-top: 6px; display: flex; gap: 6px; }
 #weapons div { background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 8px; border: 2px solid transparent; font-size: 14px; }
 #weapons div.on { border-color: #ffe600; background: rgba(255,230,0,0.3); }
+#weapons div.lock { opacity: 0.35; }
+#weaponName { font-size: 16px; margin-top: 6px; color: #ffe600; }
 .hint { font-size: 13px; opacity: 0.8; margin-top: 4px; }
 
 #board { position: fixed; right: 12px; top: 12px; background: rgba(0,0,0,0.45); padding: 8px 14px; border-radius: 12px; min-width: 230px; font-size: 14px; text-shadow: 1px 1px 0 #000; }
@@ -40,7 +45,9 @@ button:disabled { background: #888; cursor: default; }
 
 #popup { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); font-size: 40px; color: #ffe600; text-shadow: 3px 3px 0 #000; pointer-events: none; opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
 
-#shopList { max-height: 60vh; overflow-y: auto; margin-bottom: 12px; }
+#shopBody { max-height: 62vh; overflow-y: auto; margin-bottom: 12px; }
+#shopBody h3 { margin: 10px 0 2px; text-align: left; text-shadow: 2px 2px 0 #000; }
+.item .ico { font-size: 28px; width: 40px; text-align: center; }
 .item { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); margin: 6px 0; padding: 6px 10px; border-radius: 12px; text-align: left; }
 .item .nm { flex: 1; }
 .item button { font-size: 15px; padding: 4px 12px; }

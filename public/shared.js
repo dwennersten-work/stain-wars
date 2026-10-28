@@ -9,25 +9,35 @@
   S.RESPAWN_MS = 2000;
 
   // More tiers = wilder colors + glow. res = fraction of damage blocked ("stain resistance").
+  // Outfits are permanent and bought one level at a time (must own tier N to buy N+1).
   S.OUTFITS = [
     { name: 'Plain Beige Tee',       cost: 0,   res: 0.00, shirt: 0xd8c9a8, pants: 0x8a7f6a, hat: 0xb5a888, glow: 0 },
-    { name: 'Khaki Dad Fit',         cost: 30,  res: 0.08, shirt: 0xc2b280, pants: 0x6b5d3f, hat: 0x3a5f8a, glow: 0 },
-    { name: 'Pastel Picnic',         cost: 60,  res: 0.15, shirt: 0xffb3d9, pants: 0xb3e6ff, hat: 0xfff0a0, glow: 0 },
-    { name: 'Neon Gym Rat',          cost: 100, res: 0.22, shirt: 0x39ff14, pants: 0x111111, hat: 0xff5f1f, glow: 0.15 },
-    { name: 'Tie-Dye Festival',      cost: 150, res: 0.29, shirt: 0xff00aa, pants: 0x00e5ff, hat: 0xffea00, glow: 0.2 },
-    { name: 'Leopard Lame',          cost: 220, res: 0.35, shirt: 0xffa500, pants: 0x8b00ff, hat: 0x00ff88, glow: 0.3 },
-    { name: 'Hot Pink Cowboy',       cost: 300, res: 0.41, shirt: 0xff1493, pants: 0x00ffff, hat: 0xffff00, glow: 0.4 },
-    { name: 'Holographic Popstar',   cost: 400, res: 0.47, shirt: 0xb0fffa, pants: 0xff00ff, hat: 0x7cff00, glow: 0.5, rainbow: 0.3 },
-    { name: 'Disco Ball Royalty',    cost: 520, res: 0.53, shirt: 0xffffff, pants: 0xffd700, hat: 0xff00ff, glow: 0.6, rainbow: 0.6 },
-    { name: 'Rainbow Chaos Supreme', cost: 700, res: 0.60, shirt: 0xff0000, pants: 0x00ff00, hat: 0x0000ff, glow: 0.8, rainbow: 1.5 },
+    { name: 'Khaki Dad Fit',         cost: 30,  res: 0.05, shirt: 0xc2b280, pants: 0x6b5d3f, hat: 0x3a5f8a, glow: 0 },
+    { name: 'Pastel Picnic',         cost: 60,  res: 0.10, shirt: 0xffb3d9, pants: 0xb3e6ff, hat: 0xfff0a0, glow: 0 },
+    { name: 'Neon Gym Rat',          cost: 90,  res: 0.15, shirt: 0x39ff14, pants: 0x111111, hat: 0xff5f1f, glow: 0.15 },
+    { name: 'Tie-Dye Festival',      cost: 130, res: 0.20, shirt: 0xff00aa, pants: 0x00e5ff, hat: 0xffea00, glow: 0.2 },
+    { name: 'Leopard Lame',          cost: 180, res: 0.25, shirt: 0xffa500, pants: 0x8b00ff, hat: 0x00ff88, glow: 0.3 },
+    { name: 'Hot Pink Cowboy',       cost: 240, res: 0.30, shirt: 0xff1493, pants: 0x00ffff, hat: 0xffff00, glow: 0.4 },
+    { name: 'Holographic Popstar',   cost: 310, res: 0.35, shirt: 0xb0fffa, pants: 0xff00ff, hat: 0x7cff00, glow: 0.5, rainbow: 0.3 },
+    { name: 'Disco Ball Royalty',    cost: 390, res: 0.40, shirt: 0xffffff, pants: 0xffd700, hat: 0xff00ff, glow: 0.6, rainbow: 0.6 },
+    { name: 'Rainbow Chaos Supreme', cost: 480, res: 0.45, shirt: 0xff0000, pants: 0x00ff00, hat: 0x0000ff, glow: 0.8, rainbow: 1.5 },
   ];
-  S.killReward = (victimTier) => 15 + 20 * victimTier;
+  S.killReward = (victimTier) => 20 + 15 * victimTier;
 
+  // Food weapons. Everyone starts with Mustard; the rest are bought once and kept forever.
+  // Flags: pellets (shotgun), splash (radius), lob (extra upward speed), head (headshot damage),
+  // pierce (ignores stain resistance), scope (hotdog zoom), pack/maxAmmo (consumable), blind (radius).
   S.WEAPONS = [
-    { id: 0, name: 'Mustard Squirter', cd: 0.09, speed: 28,  life: 0.45, dmg: 7,  grav: 4,  r: 0.15, spread: 0.05, color: 0xffd400 },
-    { id: 1, name: 'Hamburger Grenade', cd: 1.1, speed: 17,  life: 2.5,  dmg: 55, grav: 18, r: 0.3,  splash: 4.5,  color: 0x8b4513 },
-    { id: 2, name: 'Ketchup Sniper',   cd: 1.4,  speed: 140, life: 1.2,  dmg: 65, grav: 0,  r: 0.1,  color: 0xe0001b },
+    { id: 0, name: 'Mustard Squirter',   icon: '💛', cost: 0,   cd: 0.09, speed: 28,  life: 0.45, dmg: 7,  grav: 4,  r: 0.15, spread: 0.05, color: 0xffd400, desc: 'Rapid squirts, short range' },
+    { id: 1, name: 'Soda Shotgun',       icon: '🥤', cost: 40,  cd: 0.9,  speed: 32,  life: 0.35, dmg: 9,  grav: 6,  r: 0.12, spread: 0.22, pellets: 8, color: 0x5a2a10, desc: '8 fizzy blobs, brutal up close' },
+    { id: 2, name: 'Spaghetti Whip',     icon: '🍝', cost: 60,  cd: 0.55, speed: 40,  life: 0.11, dmg: 35, grav: 0,  r: 0.5,  color: 0xf3d36b, desc: 'Wide melee lash, 4m reach' },
+    { id: 3, name: 'Hamburger Grenade',  icon: '🍔', cost: 100, cd: 1.1,  speed: 17,  life: 2.5,  dmg: 55, grav: 18, r: 0.3,  splash: 4.5, lob: 4, color: 0x8b4513, desc: 'Lobbed, big splash' },
+    { id: 4, name: 'Pie Launcher',       icon: '🥧', cost: 150, cd: 0.9,  speed: 24,  life: 2,    dmg: 60, grav: 9,  r: 0.28, splash: 2.2, lob: 2, color: 0xf5e6c8, desc: 'Heavy pie, small splash' },
+    { id: 5, name: 'Ketchup Sniper',     icon: '🌭', cost: 250, cd: 1.4,  speed: 140, life: 1.2,  dmg: 50, grav: 0,  r: 0.1,  head: 999, pierce: true, scope: true, color: 0xe0001b, desc: 'Head = 1 shot, body = 2. Ignores outfits' },
+    { id: 6, name: 'Whipped Cream Bomb', icon: '🍦', cost: 30,  cd: 0.8,  speed: 16,  life: 1.4,  dmg: 0,  grav: 18, r: 0.25, blind: 10, lob: 4, pack: 3, maxAmmo: 6, color: 0xffffff, desc: 'Blinds nearby players. 3 per pack' },
   ];
+  S.FLASH = 6;           // whipped cream bomb index (thrown with G, not a weapon slot)
+  S.HEAD_Y = 1.62;       // hits above feet + this count as headshots
 
   // Deterministic map so server and clients agree.
   function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
