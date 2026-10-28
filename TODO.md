@@ -35,6 +35,10 @@
 - [x] Fix false snap-backs when bunny hopping
 - [x] Blinded players' shots spray server-side
 - [x] Anti kill-farming: idle victims pay nothing, repeat-victim decay, income cap
+- [x] `Object.freeze(Shared)` blocks the console speed hack (`Shared.SPEED = …`)
+- [x] Tighten server speed limit: budget refill 1.3× → 1.05× walk speed, snap-backs every 250ms (was 500ms)
+- [x] Deep-freeze `Shared` (nested WEAPONS/OUTFITS/BOXES too)
+- [ ] Re-test speed hacks on the droplet with real students after `stainwars update`
 
 ## Later (ideas, not started)
 - [ ] Web admin dashboard `/admin`: live CPU/RAM/network/player-count graphs for screensharing

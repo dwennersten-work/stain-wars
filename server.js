@@ -114,7 +114,8 @@ function clientMove(p, a) {
   if (p.dead || now < p.ignoreUntil || !Array.isArray(a) || a.length !== 4 || !a.every(Number.isFinite)) return;
   const dt = Math.min(0.5, (now - p.lastMove) / 1000);
   p.lastMove = now;
-  p.budget = Math.min(2.5, p.budget + dt * S.SPEED * 1.3);   // 2.5m = ~250ms of lag allowance
+  // Refill at barely over walk speed; the 2.5m cap (~250ms) absorbs lag bursts. A 1.3x rate let speed hacks keep 30%.
+  p.budget = Math.min(2.5, p.budget + dt * S.SPEED * 1.05);
   const q = { x: a[0], y: a[1], z: a[2] };
   const dx = q.x - p.x, dz = q.z - p.z, dist = Math.hypot(dx, dz);
   if (dist > p.budget) { q.x = p.x + dx / dist * p.budget; q.z = p.z + dz / dist * p.budget; }
@@ -136,7 +137,7 @@ function clientMove(p, a) {
   p.falling = q.y < p.y;
   p.x = q.x; p.y = q.y; p.z = q.z; p.ry = a[3];
   // Tell a cheating (or badly lagging) client where it really is.
-  if (Math.hypot(q.x - a[0], q.y - a[1], q.z - a[2]) > 0.5 && now - p.lastFix > 500) {
+  if (Math.hypot(q.x - a[0], q.y - a[1], q.z - a[2]) > 0.5 && now - p.lastFix > 250) {
     p.lastFix = now;
     p.socket.emit('setpos', { x: p.x, y: p.y, z: p.z });
   }

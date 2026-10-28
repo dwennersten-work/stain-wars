@@ -105,5 +105,7 @@
     'Snoop Doggo', 'Cardi Beep', 'Megan Thee Scallion', 'Jack Harlowe-een', 'Sabrina Carpenter Ant', 'Chappell Roan-ald',
     'Pedro Pastrami', 'Jenna Orteguacamole', 'Millie Bobby Brownie', 'Lil Nas Ketchup', 'Kylie Jennerator', 'Zac Effrontery',
     'Adele-icious', 'Pharrell Squirrel', 'Miley Silly-rus', 'Shakira Shakira Shaker'];
-    Object.freeze(S);
+  // Lock everything (nested too) so `Shared.SPEED = 30` in the console does nothing. Just a speed bump:
+  // the server's movement checks are the real defense.
+  (function deepFreeze(o) { Object.values(o).forEach(v => v && typeof v === 'object' && deepFreeze(v)); return Object.freeze(o); })(S);
 })(typeof module !== 'undefined' ? module.exports : (window.Shared = {}));
