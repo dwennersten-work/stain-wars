@@ -105,4 +105,5 @@
     'Snoop Doggo', 'Cardi Beep', 'Megan Thee Scallion', 'Jack Harlowe-een', 'Sabrina Carpenter Ant', 'Chappell Roan-ald',
     'Pedro Pastrami', 'Jenna Orteguacamole', 'Millie Bobby Brownie', 'Lil Nas Ketchup', 'Kylie Jennerator', 'Zac Effrontery',
     'Adele-icious', 'Pharrell Squirrel', 'Miley Silly-rus', 'Shakira Shakira Shaker'];
+    Object.freeze(S);
 })(typeof module !== 'undefined' ? module.exports : (window.Shared = {}));
