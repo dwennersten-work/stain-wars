@@ -17,12 +17,14 @@ if ! command -v node >/dev/null || [ "$(node -v | cut -c2- | cut -d. -f1)" -lt 1
 fi
 
 echo "== Getting the game ($BRANCH) =="
+# Ignore file modes: this script makes admin.sh executable, and git would otherwise call that a local change and refuse to update it.
 if [ -d "$DIR/.git" ]; then
+  git -C "$DIR" config core.fileMode false
   git -C "$DIR" fetch origin
   git -C "$DIR" checkout "$BRANCH"
   git -C "$DIR" pull --ff-only
 else
-  git clone --branch "$BRANCH" "$REPO" "$DIR"
+  git clone -c core.fileMode=false --branch "$BRANCH" "$REPO" "$DIR"
 fi
 cd "$DIR" && npm ci --omit=dev   # exact versions from package-lock.json
 
@@ -66,9 +68,13 @@ echo "   http://$IP"
 echo
 echo " Teacher commands:"
 echo "   htop                 watch CPU / RAM live"
+echo "   stainwars newgame    start a 15 min free-for-all + 5 min Owl Showdown"
+echo "   stainwars skip       jump to the next phase"
+echo "   stainwars stop       end the game, back to free play"
 echo "   stainwars status     players, bots, projectiles"
 echo "   stainwars bots 10    add 10 derpy bots"
 echo "   stainwars nobots     remove all bots"
 echo "   stainwars reset      reset everyone's outfits/money"
 echo "   stainwars logs       follow server log"
+echo "   stainwars update     pull the latest version and restart"
 echo "=============================================="

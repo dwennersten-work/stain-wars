@@ -59,6 +59,8 @@
 - [x] Weapon levels and buyable +5% damage upgrades, priced like outfits
 - [x] Blasts and cream stopped by walls; name tags hidden by walls
 - [x] Server anti-cheat updated: double jump, floors, ceilings, long falls
+- [ ] Test the branch on a droplet, then merge to main
+- [ ] Check shooting, tray hit sounds and the level-up popup in a real browser
 - [ ] Playtest with a real class: map size, tray price/HP, level thresholds, whether lookouts are too strong
 - [ ] Check frame rate on real school laptops (tested only on a software renderer so far)
 

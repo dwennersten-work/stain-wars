@@ -4,7 +4,8 @@
   "description": "Derpy multiplayer food-fight FPS for a classroom cloud-computing demo",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node tests/sim_map.js && node tests/sim_server.js"
   },
   "dependencies": {
     "socket.io": "^4.8.1"

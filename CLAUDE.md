@@ -6,7 +6,8 @@
 - `server.js`: Node HTTP + Socket.io. Authoritative projectiles/damage/money, derpy bots, localhost-only `/admin/*` endpoints.
 - `public/shared.js`: constants used by BOTH server (require) and client (global `Shared`): outfits, weapons, map gen, collision. Change gameplay numbers here.
 - `public/index.html`, `public/game.js`, `public/style.css`: Three.js client (ES module, Three from unpkg via importmap, no build step).
-- `install.sh`: droplet installer (Ubuntu). Clones the repo to `/opt/stainwars`, systemd service `stainwars`, port 80.
+- `install.sh`: droplet installer (Ubuntu). Clones the repo to `/opt/stainwars`, systemd service `stainwars`, port 80. `BRANCH=<name>` installs a branch for testing.
+- `tests/`: simulations of the real server and map code (`npm test`, also try `DT=0.05 npm test`).
 - `scripts/admin.sh`: teacher CLI, symlinked to `/usr/local/bin/stainwars`.
 
 ## Run locally

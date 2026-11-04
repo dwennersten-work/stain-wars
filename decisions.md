@@ -12,6 +12,9 @@ Important decisions and *why*. A fresh context should read this first (after `re
 - **Droplet:** Basic **$6/mo (1 vCPU / 1 GB), Ubuntu 24.04**. The teacher has $5 of credit that must last several *hours*, not days. $6/mo ≈ $0.009/hr, so cost is negligible. A small box is *better* for the lesson because load shows up visibly in htop.
 - **Access:** plain `http://<droplet-ip>` on **port 80**. No domain/HTTPS. Port 80 avoids school firewalls blocking odd ports.
 - **Install:** public GitHub repo `dwennersten-work/stain-wars` + one-liner `curl … install.sh | bash`. Runs as a systemd service `stainwars` from `/opt/stainwars`.
+- **Testing a branch:** piping the installer into `BRANCH=<name> bash` installs that branch (default `main`), so a droplet can try new work before students get it. Use the script from that same branch. `stainwars update` always runs `main`'s script. While `main`'s script is the older one, that update stays on the installed branch; once this option is merged, it returns the droplet to `main`.
+- **Versions:** `v1.0.0` is a tagged GitHub release of the first working version, as a known-good fallback.
+- **Installer ignores file modes** (`core.fileMode false`): it makes `admin.sh` executable after cloning, which git would otherwise count as a local change and refuse to update. Committing the file as executable was rejected, because that mode change would itself block the next update on droplets already installed.
 
 ## Gameplay
 - **Arena with timed game sessions.** Drop in any time. Until the teacher starts a game it's endless free play. `stainwars newgame [ffaMin] [teamMin]` wipes everyone's progress and runs: free-for-all (default 15 min) → Owl Showdown (default 5 min) → 30s results → free play. **No timer starts by itself**, so a game can't run out in an empty server before class. There is one game at a time in one arena (a single class on a small droplet doesn't need parallel rooms). All session state is in memory, since the server must not write files.
@@ -63,3 +66,4 @@ The goal is to make sure that hosting the game can't hurt the teacher's GitHub o
 
 ## Process
 - Build an MVP fast ("the gist"), keep error checking minimal, and track extras in `TODO.md`.
+- **`npm test`** runs simulations against the real `shared.js` and `server.js` with no new dependencies: every building climbed, falls, cheat attempts, tray, levels, blasts. `sim_server.js` loads `server.js` with a fake clock and fake sockets. Run with `DT=0.05` too: the stair bug only appeared at low frame rates. It doesn't cover rendering, so also play it in a browser.
