@@ -449,7 +449,7 @@ function loop() {
   v.rotation.x += (v.userData.rx - v.rotation.x) * 0.15;
 
   // hotdog scope
-  const scoped = zoom && W.scope && alive;
+  const scoped = !!(zoom && W.scope && alive);   // must be a real boolean: classList.toggle('on', undefined) flips every frame
   camera.fov += ((scoped ? 18 : 75) - camera.fov) * 0.25;
   camera.updateProjectionMatrix();
   $('scope').classList.toggle('on', scoped && camera.fov < 30);
