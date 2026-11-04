@@ -10,21 +10,54 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87e0ff);
-scene.fog = new THREE.Fog(0x87e0ff, 40, 110);
-const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 300);
+scene.fog = new THREE.Fog(0x87e0ff, 90, 280);
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 450);
 scene.add(camera);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x88aa66, 1.4));
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb0a890, 1.4));   // neutral from below, or indoor ceilings turn green
 const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(20, 40, 10); scene.add(sun);
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 const mat = (color, extra) => new THREE.MeshLambertMaterial({ color, flatShading: true, ...extra });
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), mat(0x7ed957));
-ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), mat(0x7ed957));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; scene.add(ground);
 const arena = new THREE.Mesh(new THREE.PlaneGeometry(S.ARENA * 2, S.ARENA * 2, 20, 20), mat(0x9be564, { wireframe: false }));
-arena.rotation.x = -Math.PI / 2; arena.position.y = 0.01; scene.add(arena);
-for (const b of S.BOXES) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), mat(b.color));
-  m.position.set(b.x, b.h / 2, b.z); scene.add(m);
+arena.rotation.x = -Math.PI / 2; scene.add(arena);
+// All the map's boxes go into one mesh (one draw call), so school laptops don't pay for thousands of separate objects.
+// Undersides are darker so ceilings read as ceilings, since there are no real shadows.
+// Each building also gets a thin ground floor. It's only for looks (you'd stand at 0 anyway), so it isn't in S.BOXES.
+(function buildWorld() {
+  const floors = S.BUILDINGS.map(B => ({ x: B.x, z: B.z, w: B.w, d: B.d, y: -0.1, top: 0.015, color: 0xeee3cf }));
+  const all = [...S.BOXES, ...floors];
+  const t = new THREE.BoxGeometry(1, 1, 1), tp = t.attributes.position, tn = t.attributes.normal, ti = t.index, n = all.length;
+  const pos = new Float32Array(n * tp.count * 3), nor = new Float32Array(n * tp.count * 3), col = new Float32Array(n * tp.count * 3), idx = new Uint32Array(n * ti.count);
+  const c = new THREE.Color();
+  all.forEach((b, i) => {
+    const h = b.top - b.y, base = i * tp.count;
+    c.setHex(b.color);
+    for (let v = 0; v < tp.count; v++) {
+      const k = (base + v) * 3, ny = tn.getY(v), shade = ny < 0 ? 0.8 : ny > 0 ? 1 : 0.88;
+      pos[k] = b.x + tp.getX(v) * b.w; pos[k + 1] = b.y + h / 2 + tp.getY(v) * h; pos[k + 2] = b.z + tp.getZ(v) * b.d;
+      nor[k] = tn.getX(v); nor[k + 1] = ny; nor[k + 2] = tn.getZ(v);
+      col[k] = c.r * shade; col[k + 1] = c.g * shade; col[k + 2] = c.b * shade;
+    }
+    for (let v = 0; v < ti.count; v++) idx[i * ti.count + v] = base + ti.getX(v);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
+})();
+// A painted sign over each building's front door.
+for (const B of S.BUILDINGS) {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
+  const c = cv.getContext('2d');
+  c.fillStyle = '#fff6d8'; c.fillRect(0, 0, 512, 96);
+  c.fillStyle = '#7b2ff7'; c.font = 'bold 60px Comic Sans MS, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(B.name, 256, 50, 490);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 0.8), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
+  sign.position.set(B.doorX, 3.15, B.doorZ + 0.03); scene.add(sign);
 }
 // fence + silly scenery
 for (let i = 0; i < 4; i++) {
@@ -47,6 +80,20 @@ const G = {
   blob: new THREE.IcosahedronGeometry(1, 1), cone: new THREE.ConeGeometry(1, 1, 5), cube: new THREE.BoxGeometry(1, 1, 1),
 };
 const skin = mat(0xffcc99), white = mat(0xffffff), black = mat(0x000000);
+// The Cafeteria Tray. Faces forward (-z) and is the same model for avatars and your own view.
+const trayMat = (c) => mat(c, { emissive: new THREE.Color(c).multiplyScalar(0.35) });
+const trayMats = { tray: trayMat(0x45d6c6), rim: trayMat(0x2a9d90), a: trayMat(0xffd400), b: trayMat(0xe0001b) };
+function makeTray(s) {
+  const g = new THREE.Group(), add = (m, x, y, sx, sy, sz, z = 0) => { const o = new THREE.Mesh(G.cube, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); g.add(o); };
+  add(trayMats.rim, 0, 0, 0.8, 0.58, 0.04);
+  add(trayMats.tray, 0, 0, 0.72, 0.5, 0.05, -0.01);
+  for (const z of [-0.04, 0.04]) {   // old lunch stains, on both sides
+    add(trayMats.a, -0.18, 0.08, 0.2, 0.2, 0.02, z);
+    add(trayMats.b, 0.2, -0.1, 0.14, 0.14, 0.02, z);
+  }
+  g.scale.setScalar(s);
+  return g;
+}
 
 // Team owls. Same height as a person at size 1 (faces -z). Different silhouettes as well as colors, so teams are
 // easy to tell apart at a distance: a round golden barn owl with a white heart face vs. a dark purple great horned
@@ -100,10 +147,11 @@ function makeAvatar() {
   const pupils = [add(G.pupil, black, -0.15, 1.92, -0.42), add(G.pupil, black, 0.17, 1.95, -0.45)];
   const h = add(G.hat, hat, 0.05, 2.35, 0); h.rotation.z = 0.25;
   const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64;
-  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
+  const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas) }));   // depth tested: walls hide name tags
   tag.scale.set(2.4, 0.6, 1); tag.position.y = 2.95; g.add(tag);
+  const tray = makeTray(1); tray.position.set(-0.32, 1.25, -0.62); tray.rotation.y = 0.25; tray.visible = false; g.add(tray);
   scene.add(g);
-  return { g, human, shirt, pants, hat, armL, armR, pupils, eyes: [eyeL, eyeR], canvas, tag, tier: -1, hp: -1, name: '',
+  return { g, human, tray, shirt, pants, hat, armL, armR, pupils, eyes: [eyeL, eyeR], canvas, tag, tier: -1, hp: -1, name: '',
     team: 0, owl: null, owls: {}, size: 1, sizeTarget: 1, target: new THREE.Vector3(), ry: 0, phase: Math.random() * 10 };
 }
 
@@ -191,6 +239,7 @@ const views = [
   })(),
 ];
 views.forEach(v => { v.position.set(0.35, -0.32, -0.9); v.rotation.y = 0.15; v.userData.rx = v.rotation.x; v.visible = false; camera.add(v); });
+const trayView = makeTray(0.42); trayView.position.set(-0.5, -0.27, -0.85); trayView.rotation.set(-0.1, 0.25, 0.08); trayView.visible = false; camera.add(trayView);
 
 const shots = new Map();
 const parts = [];
@@ -208,11 +257,12 @@ function splat(p, w) {
     parts.push({ m, v: new THREE.Vector3((Math.random() - 0.5) * sp, Math.random() * sp, (Math.random() - 0.5) * sp), t: 0.6 });
     scene.add(m);
   }
-  if (p[1] < 0.3 || Math.random() < 0.3) {
+  const floor = S.floorBelow(p[0], p[1] + 0.2, p[2]);
+  if (p[1] - floor < 0.3 || Math.random() < 0.3) {
     const d = new THREE.Mesh(decalGeo, new THREE.MeshBasicMaterial({ color: cols[Math.floor(Math.random() * cols.length)] }));
     d.rotation.set(-Math.PI / 2, 0, Math.random() * 6);
     d.scale.setScalar(big ? 2.5 : 0.4 + Math.random() * 0.5);
-    d.position.set(p[0], 0.02 + Math.random() * 0.01, p[2]);
+    d.position.set(p[0], floor + 0.02 + Math.random() * 0.01, p[2]);
     scene.add(d); decals.push(d);
     if (decals.length > 150) scene.remove(decals.shift());
   }
@@ -277,6 +327,10 @@ const SFX = {
   chaching: () => { tone(2100, 0.06, { type: 'triangle', vol: 0.08, to: 2100 }); tone(2800, 0.4, { type: 'triangle', vol: 0.08, to: 2800, at: 0.06 }); noise(0.15, { vol: 0.05, type: 'highpass', f: 6000, at: 0.06 }); },
   nope: () => tone(150, 0.2, { vol: 0.04, to: 140 }),
   jump: () => tone(250, 0.14, { type: 'sine', vol: 0.03, to: 650 }),
+  jump2: () => tone(450, 0.16, { type: 'sine', vol: 0.05, to: 1300 }),
+  clang: () => { tone(700, 0.1, { type: 'square', vol: 0.05, to: 640 }); tone(1500, 0.18, { type: 'triangle', vol: 0.05, to: 1450 }); },
+  crash: () => { noise(0.4, { vol: 0.14, type: 'highpass', f: 2500, to: 6000 }); tone(500, 0.3, { type: 'square', vol: 0.06, to: 90 }); },
+  levelUp: () => notes([[523, 0.09], [784, 0.09], [1046, 0.2]], { type: 'triangle', vol: 0.09 }),
   hoot: () => notes([[330, 0.25], [294, 0.5], [330, 0.2], [294, 0.6]], { type: 'sine', vol: 0.14, vib: 6 }),
 };
 const fireSfx = [SFX.squirt, SFX.fizz, SFX.whip, SFX.lob, SFX.lob, SFX.snipe, SFX.spray];
@@ -286,6 +340,7 @@ const me = { x: 0, y: 0, z: 0, vy: 0, onGround: true };
 let myId = 0, myName = '', yaw = 0, pitch = 0, alive = true, hp = 100, tier = 0, money = 0, earned = 0, ammo = 0, blindLeft = 0;
 let phase = 'free', phaseLeft = 0, teamNext = true, scores = [0, 0], myTeam = 0, myScale = 1, eyeScale = 1;
 let owned = S.WEAPONS.map((_, i) => i === 0 ? 1 : 0);
+let wstains = S.WEAPONS.map(() => 0), dmgLv = S.WEAPONS.map(() => 0), hasTray = false, trayHp = 0, trayBackAt = 0, viewY = 0;
 let weapon = 0, firing = false, zoom = false, lastFire = 0, lastBomb = 0, kick = 0, lastSend = 0, inShop = false;
 const SLOTS = S.FLASH;   // weapon slots 1..6; the cream bomb is thrown with G
 const keys = {};
@@ -320,6 +375,7 @@ document.addEventListener('pointerlockchange', () => {
 function setWeapon(w) {
   if (w >= SLOTS) return;
   if (!owned[w]) { popup(`🔒 Buy the ${S.WEAPONS[w].name} in the shop [B]`); SFX.nope(); return; }
+  if (w !== weapon) socket.emit('equip', w);   // the server needs to know: the tray only works with one-handed food
   weapon = w;
   views.forEach((v, i) => v.visible = i === w);
   renderWeapons();
@@ -327,9 +383,9 @@ function setWeapon(w) {
 function renderWeapons() {
   const F = S.WEAPONS[S.FLASH];
   $('weapons').innerHTML = S.WEAPONS.slice(0, SLOTS).map((W, i) =>
-    `<div class="${i === weapon ? 'on' : ''} ${owned[i] ? '' : 'lock'}">${i + 1} ${W.icon}</div>`).join('') +
+    `<div class="${i === weapon ? 'on' : ''} ${owned[i] ? '' : 'lock'}">${i + 1} ${W.icon}${dmgLv[i] ? '⭐' + dmgLv[i] : ''}</div>`).join('') +
     `<div class="${ammo ? '' : 'lock'}">G ${F.icon}×${ammo}</div>`;
-  $('weaponName').textContent = S.WEAPONS[weapon].name;
+  $('weaponName').textContent = S.WEAPONS[weapon].name + (dmgLv[weapon] ? ` (+${Math.round(dmgLv[weapon] * S.DMG_STEP * 100)}% damage)` : '');
 }
 function throwBomb() {
   const now = performance.now();
@@ -347,12 +403,28 @@ const swatches = (o) => [o.shirt, o.pants, o.hat].map(c => `<span class="sw" sty
 function renderShop() {
   $('shopMoney').textContent = `— $${money}`;
   const btn = (attr, ok, label) => `<button ${attr} ${ok ? '' : 'disabled'}>${label}</button>`;
+  const pct = (n) => Math.round(n * S.DMG_STEP * 100);
+  // Stains with a weapon raise its level; each level unlocks one damage upgrade to buy.
+  const levelLine = (W, i) => {
+    if (W.pack || !owned[i]) return '';
+    if (W.noUpgrade) return '<br><small class="lv">⭐ No damage levels: its 2-shot rule never changes</small>';
+    const lv = S.weaponLevel(wstains[i]), next = S.LEVEL_STAINS[lv];
+    return `<br><small class="lv">⭐ Level ${lv}/${S.LEVEL_STAINS.length} · ${wstains[i]} stains${next ? ` (next level at ${next})` : ''} · damage +${pct(dmgLv[i])}%</small>`;
+  };
+  const upgradeBtn = (W, i) => {
+    if (!owned[i] || !S.canUpgrade(W) || dmgLv[i] >= S.LEVEL_STAINS.length) return '';
+    const cost = S.upgradeCost(dmgLv[i]), unlocked = dmgLv[i] < S.weaponLevel(wstains[i]);
+    return btn(`data-u="${i}"`, unlocked && money >= cost, `${unlocked ? '' : '🔒 '}+${pct(1)}% dmg $${cost}`);
+  };
   $('shopFood').innerHTML = S.WEAPONS.map((W, i) => {
     const right = W.pack ? btn(`data-w="${i}"`, money >= W.cost && ammo < W.maxAmmo, ammo >= W.maxAmmo ? 'Full' : `+${W.pack} for $${W.cost}`)
-      : owned[i] ? '<b>OWNED</b>' : btn(`data-w="${i}"`, money >= W.cost, `Buy $${W.cost}`);
+      : owned[i] ? upgradeBtn(W, i) || '<b>OWNED</b>' : btn(`data-w="${i}"`, money >= W.cost, `Buy $${W.cost}`);
     return `<div class="item ${owned[i] ? 'cur' : ''}"><span class="ico">${W.icon}</span>
-      <span class="nm"><b>${W.name}</b><br><small>${W.desc}${W.pack ? ` · have ${ammo}/${W.maxAmmo} · throw with G` : ''}</small></span>${right}</div>`;
+      <span class="nm"><b>${W.name}</b><br><small>${W.desc}${W.pack ? ` · have ${ammo}/${W.maxAmmo} · throw with G` : ''}</small>${levelLine(W, i)}</span>${right}</div>`;
   }).join('');
+  $('shopGear').innerHTML = `<div class="item ${hasTray ? 'cur' : ''}"><span class="ico">${S.TRAY.icon}</span>
+    <span class="nm"><b>${S.TRAY.name}</b><br><small>${S.TRAY.desc}</small></span>
+    ${hasTray ? '<b>OWNED</b>' : btn('data-t="1"', money >= S.TRAY.cost, `Buy $${S.TRAY.cost}`)}</div>`;
   $('shopList').innerHTML = S.OUTFITS.map((o, i) => `
     <div class="item ${i === tier ? 'cur' : ''}">${swatches(o)}
       <span class="nm"><b>${o.name}</b><br><small>Stain resistance ${Math.round(o.res * 100)}% · $${o.cost}</small></span>
@@ -360,8 +432,8 @@ function renderShop() {
     </div>`).join('');
 }
 $('shopBody').onclick = (e) => {
-  const { o, w } = e.target.dataset;
-  if (o) socket.emit('buy', +o); else if (w) socket.emit('buyw', +w); else return;
+  const { o, w, u, t } = e.target.dataset;
+  if (o) socket.emit('buy', +o); else if (w) socket.emit('buyw', +w); else if (u) socket.emit('buyup', +u); else if (t) socket.emit('buytray'); else return;
   SFX.chaching();
 };
 function toggleShop() {
@@ -379,6 +451,11 @@ function updateHud() {
   $('kills').textContent = earned + ' stains';
   const o = S.OUTFITS[tier];
   $('outfit').innerHTML = `${swatches(o)} ${o.name} (${Math.round(o.res * 100)}% resist)`;
+  $('tray').classList.toggle('hidden', !hasTray);
+  if (hasTray) {
+    $('tray').textContent = trayHp <= 0 ? `${S.TRAY.icon} Tray back in ${Math.ceil(Math.max(0, trayBackAt - performance.now()) / 1000)}s`
+      : S.WEAPONS[weapon].twoHanded ? `${S.TRAY.icon} Tray put away (two-handed food)` : `${S.TRAY.icon} Tray ${trayHp}/${S.TRAY.hp}`;
+  }
   $('owlInfo').classList.toggle('hidden', !myTeam);
   if (myTeam) {
     const T = S.TEAMS[myTeam - 1];
@@ -430,7 +507,13 @@ function flash(color) {
 socket.on('welcome', (m) => { myId = m.id; myName = m.name; Object.assign(me, m.spawn); $('myName').textContent = m.name; });
 socket.on('me', (m) => {
   const got = m.owned.findIndex((o, i) => o && !owned[i]);   // just bought a weapon? equip it
+  const levelled = m.wstains.findIndex((n, i) => S.weaponLevel(n) > S.weaponLevel(wstains[i]));
+  if (levelled >= 0 && S.canUpgrade(S.WEAPONS[levelled])) {
+    popup(`⭐ ${S.WEAPONS[levelled].name} level ${S.weaponLevel(m.wstains[levelled])}! Upgrade it in the shop [B]`);
+    SFX.levelUp();
+  }
   money = m.money; earned = m.earned; tier = m.tier; ammo = m.ammo; owned = m.owned;
+  wstains = m.wstains; dmgLv = m.dmgLv; hasTray = !!m.tray; trayHp = m.trayHp; trayBackAt = performance.now() + m.trayIn;
   if (got >= 0 && got < SLOTS) setWeapon(got); else if (!owned[weapon]) setWeapon(0); else renderWeapons();
   updateHud(); if (inShop) renderShop();
 });
@@ -440,12 +523,12 @@ socket.on('respawn', (p) => { Object.assign(me, p, { vy: 0 }); alive = true; hp 
 socket.on('blind', (secs) => { blindLeft = Math.max(blindLeft, Math.min(5, +secs || 0)); SFX.poof(); });
 socket.on('snap', (list) => {
   const seen = new Set();
-  for (const [id, x, y, z, ry, t, h, dead] of list) {
+  for (const [id, x, y, z, ry, t, h, dead, tray] of list) {
     seen.add(id);
     if (id === myId) { if (!dead) hp = h; continue; }
     let a = avatars.get(id);
     if (!a) { a = makeAvatar(); a.g.position.set(x, y, z); avatars.set(id, a); }
-    a.target.set(x, y, z); a.ry = ry; a.g.visible = !dead;
+    a.target.set(x, y, z); a.ry = ry; a.g.visible = !dead; a.tray.visible = !!tray;
     const inf = info.get(id), nm = inf ? inf.name : '', team = inf ? inf.team : 0;
     a.sizeTarget = inf ? inf.scale : 1;
     if (a.team !== team) { setForm(a, team); a.hp = -1; }
@@ -502,19 +585,25 @@ socket.on('ouch', (m) => {
   hp = m.hp; flash(hex(S.WEAPONS[m.w].color)); updateHud();
   if (m.head) SFX.bonk(); else if (performance.now() - lastOuch > 80) { lastOuch = performance.now(); SFX.oof(); }
 });
+socket.on('trayhit', (m) => {
+  if (m.broke) { SFX.crash(); popup(`${S.TRAY.icon} Tray smashed! Back in ${S.TRAY.respawnMs / 1000}s`); } else SFX.clang();
+});
 socket.on('hitmark', (m) => {
-  const h = $('hitmark'); h.style.opacity = 1; setTimeout(() => h.style.opacity = 0, 120);
-  if (m && m.head) { SFX.bonk(); popup('🎯 BONK! HEADSHOT!'); }
+  const h = $('hitmark'); h.style.color = m && m.tray ? '#7ff' : ''; h.style.opacity = 1; setTimeout(() => h.style.opacity = 0, 120);
+  if (m && m.tray) { if (m.broke) { SFX.crash(); popup(`${S.TRAY.icon} You smashed their tray!`); } else if (performance.now() - lastHit > 80) { lastHit = performance.now(); SFX.clang(); } }
+  else if (m && m.head) { SFX.bonk(); popup('🎯 BONK! HEADSHOT!'); }
   else if (performance.now() - lastHit > 80) { lastHit = performance.now(); SFX.hit(); }
 });
 socket.on('kill', (k) => {
   const div = document.createElement('div');
-  div.textContent = `${k.k} ${S.WEAPONS[k.w].icon}${k.head ? '🎯' : ''} ${k.v}${k.pts ? ` +${k.pts} pts` : ''}`;
+  const W = S.WEAPONS[k.w];   // no weapon means a fatal fall
+  div.textContent = W ? `${k.k} ${W.icon}${k.head ? '🎯' : ''} ${k.v}${k.pts ? ` +${k.pts} pts` : ''}` : `🪂 ${k.v} fell too far`;
   $('killfeed').prepend(div); setTimeout(() => div.remove(), 5000);
   if (k.k === myName && k.v !== myName) { popup(k.pts ? `🎉 You stained ${k.v}! +${k.pts} pts` : `🎉 You stained ${k.v}!`); SFX.kazoo(); }
   if (k.v === myName) {
     alive = false; firing = false; SFX.trombone();
-    $('deadMsg').textContent = `${k.k} got you with the ${S.WEAPONS[k.w].name}${k.head ? ' (HEADSHOT!)' : ''}! Your outfit and food are safe. Respawning...`;
+    $('deadMsg').textContent = W ? `${k.k} got you with the ${W.name}${k.head ? ' (HEADSHOT!)' : ''}! Your outfit and food are safe. Respawning...`
+      : 'SPLAT! You dropped more than 5 times your height. Your outfit and food are safe. Respawning...';
     $('dead').classList.remove('hidden');
   }
 });
@@ -529,13 +618,16 @@ function loop() {
     const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), r = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
     let dx = -Math.sin(yaw) * f + Math.cos(yaw) * r, dz = -Math.cos(yaw) * f - Math.sin(yaw) * r;
     const l = Math.hypot(dx, dz); if (l > 1) { dx /= l; dz /= l; }
-    const wasGround = me.onGround;
+    const wasGround = me.onGround, hadAirJump = me.usedAir;
     S.move(me, dx, dz, keys.Space, dt);
     if (wasGround && me.vy > 0) SFX.jump();
+    if (me.usedAir && !hadAirJump) SFX.jump2();
     if (l > 0 && me.onGround) kick += dt * 10;
   }
   eyeScale += (myScale - eyeScale) * Math.min(1, dt * 3);   // bigger owls see from higher up (server fires from the same height)
-  camera.position.set(me.x, me.y + 1.6 * eyeScale, me.z);
+  // Glide up and down stairs instead of snapping from step to step. Real jumps, falls and teleports stay exact.
+  viewY = me.onGround && Math.abs(me.y - viewY) < 1 ? viewY + (me.y - viewY) * Math.min(1, dt * 14) : me.y;
+  camera.position.set(me.x, viewY + S.eyeHeight(me.x, me.y, me.z, eyeScale), me.z);
   camera.rotation.set(pitch, yaw, 0, 'YXZ');
   if (now - lastSend > 50) { lastSend = now; socket.emit('pos', [me.x, me.y, me.z, yaw].map(n => Math.round(n * 100) / 100)); }
 
@@ -561,6 +653,7 @@ function loop() {
   $('scope').classList.toggle('on', scoped && camera.fov < 30);
   v.visible = !(scoped && camera.fov < 30);
   $('crosshair').style.opacity = scoped ? 0 : 1;
+  trayView.visible = hasTray && trayHp > 0 && !W.twoHanded && alive;
 
   // others: smooth + derpy animation
   for (const a of avatars.values()) {

@@ -12,7 +12,7 @@ const MAX_HUMANS = 80, MAX_PER_IP = 40, MAX_MSGS_PER_SEC = 60;
 // Anti kill-farming (students feeding kills from extra tabs): idle victims pay nothing, repeat kills on the
 // same victim pay half each time, and income is capped near what a great legit player can earn.
 const IDLE_MS = 15000, REPEAT_MS = 120000, EARN_PER_SEC = 5, EARN_MAX = 500;
-const JUMP_H = S.JUMP * S.JUMP / (2 * S.GRAVITY);   // legit max jump height
+const JUMP_H = S.MAX_RISE;   // legit max jump height (a double jump, second press at the top of the first)
 const vec3 = (a) => Array.isArray(a) && a.length === 3 && a.every(Number.isFinite);
 const ipCount = new Map();
 
@@ -86,7 +86,8 @@ function pickName(bot) {
 
 // Humans start with mustard only. Bots get every regular weapon so they stay chaotic.
 function startKit(bot) {
-  return { tier: 0, ammo: 0, owned: S.WEAPONS.map((W, i) => i === 0 || (bot && !W.pack)) };
+  return { tier: 0, ammo: 0, owned: S.WEAPONS.map((W, i) => i === 0 || (bot && !W.pack)), weapon: 0,
+    wstains: S.WEAPONS.map(() => 0), dmgLv: S.WEAPONS.map(() => 0), hasTray: false, trayHp: 0, trayBackAt: 0, trayReadyAt: 0 };
 }
 
 function newPlayer(bot, socket) {
@@ -102,6 +103,7 @@ function newPlayer(bot, socket) {
 function respawn(p) {
   Object.assign(p, S.randomSpawn(), { vy: 0, hp: S.MAX_HP, dead: false });
   resetMove(p);
+  if (p.hasTray) { p.trayHp = S.TRAY.hp; p.trayBackAt = 0; sendMe(p); }
   if (p.socket) p.socket.emit('respawn', { x: p.x, y: p.y, z: p.z });
 }
 
@@ -109,19 +111,33 @@ function respawn(p) {
 // Clients simulate their own movement, but the server only accepts moves a legit client could make:
 // horizontal speed via a token bucket, a jump-height ceiling, and a max air time (stops low-gravity floating).
 function resetMove(p) {
-  Object.assign(p, { budget: 0, air: 0, pinned: false, falling: false, peak: p.y + JUMP_H + 0.3, lastMove: Date.now(), ignoreUntil: Date.now() + 500 });
+  Object.assign(p, { budget: 0, air: 0, pinned: false, falling: false, peak: p.y + JUMP_H + 0.3, fallTop: p.y, lastMove: Date.now(), ignoreUntil: Date.now() + 500 });
 }
 
-// Walk from p toward q in small steps so a big jump can't skip through a thin box.
+// Walk from p toward q in small 3D steps so a big move can't skip through a wall, a floor or a ceiling.
 function sweep(p, q) {
-  const n = Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / 0.3) || 1, c = { x: p.x, y: p.y, z: p.z };
+  const n = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) / 0.3) || 1, c = { x: p.x, y: p.y, z: p.z };
+  const sx = (q.x - p.x) / n, sy = (q.y - p.y) / n, sz = (q.z - p.z) / n;
   let g = 0;
   for (let i = 0; i < n; i++) {
-    c.x += (q.x - p.x) / n; c.y += (q.y - p.y) / n; c.z += (q.z - p.z) / n;
+    c.x += sx; c.y += sy; c.z += sz;
     g = S.resolve(c);
+    if (c.y < g) c.y = g;   // can't sink through a floor
+    else if (sy > 0 && c.y > g + 0.05 && c.y + S.HEADROOM > c.ceil + 0.15) c.y = c.ceil - S.HEADROOM;   // or rise through a ceiling
   }
-  q.x = c.x; q.z = c.z;
+  q.x = c.x; q.y = c.y; q.z = c.z;
   return g;
+}
+
+// Called whenever the player touches down (landed) or is in the air, with the height of the ground below them.
+// The drop is measured from the highest point since they last stood on something, so a late double jump can't save you.
+function trackFall(p, landed, g, y) {
+  if (!landed) { p.fallTop = Math.max(p.fallTop, y); return false; }
+  const drop = p.fallTop - g;
+  p.fallTop = y;
+  if (drop <= S.fallLimit(p.scale)) return false;
+  fallDeath(p);
+  return true;
 }
 
 function clientMove(p, a) {
@@ -131,26 +147,30 @@ function clientMove(p, a) {
   p.lastMove = now;
   // Refill at barely over walk speed; the 2.5m cap (~250ms) absorbs lag bursts. A 1.3x rate let speed hacks keep 30%.
   p.budget = Math.min(2.5, p.budget + dt * S.SPEED * 1.05);
-  const q = { x: a[0], y: a[1], z: a[2] };
+  const q = { x: a[0], y: Math.min(a[1], p.peak), z: a[2] };   // capped first, so a huge y can't sail over a wall in the sweep
   const dx = q.x - p.x, dz = q.z - p.z, dist = Math.hypot(dx, dz);
   if (dist > p.budget) { q.x = p.x + dx / dist * p.budget; q.z = p.z + dz / dist * p.budget; }
   p.budget -= Math.min(dist, p.budget);
   const g = sweep(p, q);   // no walking through boxes or out of the arena
-  if (q.y <= g + 0.05) { q.y = Math.max(q.y, g); p.air = 0; p.peak = g + JUMP_H + 0.3; p.pinned = false; }
+  let landed = false;
+  if (q.y <= g + 0.05) { q.y = Math.max(q.y, g); p.air = 0; p.peak = g + JUMP_H + 0.3; p.pinned = false; landed = true; }
   else if (p.pinned) q.y = g;   // stays pinned until the client admits it landed
   else {
     // Rising again just after falling near the ground = a landing we missed between 20Hz samples (bunny hop).
     // Floating cheaters never get here: they'd have to come back down to the ground first.
-    if (q.y > p.y && p.falling && p.y <= g + 1) { p.air = 0; p.peak = g + JUMP_H + 0.3; }
+    // Fast falls cover up to ~2m between samples, hence the 2.2m window.
+    if (q.y > p.y && p.falling && p.y <= g + 2.2) { p.air = 0; p.peak = g + JUMP_H + 0.3; landed = true; }
     // Over a box top (g > 0 only counts boxes we're nearly on top of): the client may have stepped onto it mid-jump.
     if (g > 0 && g + JUMP_H + 0.3 > p.peak) { p.peak = g + JUMP_H + 0.3; p.air = 0; }
     p.air += dt;
     if (q.y > p.peak) q.y = p.peak;
-    if (p.air > 1.5) { q.y = g; p.pinned = true; }
+    // Air time allows for a double jump plus the fall back down, however far that is.
+    if (p.air > 1.5 + Math.sqrt(2 * Math.max(0, Math.max(p.fallTop, q.y) - g) / S.GRAVITY)) { q.y = g; p.pinned = true; landed = true; }
   }
   if (Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) > 0.05 || Math.abs(a[3] - p.ry) > 0.05) p.lastActive = now;
   p.falling = q.y < p.y;
   p.x = q.x; p.y = q.y; p.z = q.z; p.ry = a[3];
+  if (trackFall(p, landed, g, q.y)) return;
   // Tell a cheating (or badly lagging) client where it really is.
   if (Math.hypot(q.x - a[0], q.y - a[1], q.z - a[2]) > 0.5 && now - p.lastFix > 250) {
     p.lastFix = now;
@@ -159,7 +179,8 @@ function clientMove(p, a) {
 }
 
 function sendMe(p) {
-  if (p.socket) p.socket.emit('me', { money: p.money, earned: p.earned, tier: p.tier, kills: p.kills, ammo: p.ammo, owned: p.owned.map(Number) });
+  if (p.socket) p.socket.emit('me', { money: p.money, earned: p.earned, tier: p.tier, kills: p.kills, ammo: p.ammo, owned: p.owned.map(Number),
+    wstains: p.wstains, dmgLv: p.dmgLv, tray: p.hasTray ? 1 : 0, trayHp: Math.ceil(p.trayHp), trayIn: p.trayHp > 0 ? 0 : Math.max(0, p.trayBackAt - Date.now()) });
 }
 
 // Outfits: only the next level up. Weapons: once each. Cream bombs: a pack at a time, capped.
@@ -177,6 +198,29 @@ function buyWeapon(p, w) {
   else p.owned[w] = true;
   p.money -= W.cost; sendMe(p);
 }
+
+function buyTray(p) {
+  if (p.hasTray || p.money < S.TRAY.cost) return;
+  p.money -= S.TRAY.cost; p.hasTray = true; p.trayHp = S.TRAY.hp; p.trayReadyAt = 0; sendMe(p);
+}
+
+// One damage level at a time, and only levels already earned with stains from that weapon.
+function buyUpgrade(p, w) {
+  const W = S.WEAPONS[w];
+  if (!W || !p.owned[w] || !S.canUpgrade(W)) return;
+  const n = p.dmgLv[w];
+  if (n >= S.weaponLevel(p.wstains[w]) || p.money < S.upgradeCost(n)) return;
+  p.money -= S.upgradeCost(n); p.dmgLv[w] = n + 1; sendMe(p);
+}
+
+// Switching food takes the tray down briefly, so flicking to a one-handed weapon between sniper shots can't block everything.
+function equip(p, w) {
+  if (!S.WEAPONS[w] || S.WEAPONS[w].pack || !p.owned[w] || p.weapon === w) return;
+  p.weapon = w;
+  p.trayReadyAt = Date.now() + S.TRAY.raiseMs;
+}
+
+const trayUp = (p, now) => p.hasTray && p.trayHp > 0 && !S.WEAPONS[p.weapon].twoHanded && now >= p.trayReadyAt;
 
 // ---------- Game session ----------
 function setPhase(phase, ms) {
@@ -288,9 +332,11 @@ function fire(p, w, d) {
   if (!(len > 1e-6 && len < 1e6)) return;
   d = d.map(n => n / len);
   p.lastFire[w] = now; p.lastActive = now;
-  if (W.pack) { p.ammo--; sendMe(p); } else p.lastShot = now;
+  if (W.pack) { p.ammo--; sendMe(p); } else { p.lastShot = now; equip(p, w); }
   // Always fire from the server's copy of the player's eyes, so nobody can shoot from behind a wall.
-  const o = [p.x + d[0] * 0.6, p.y + 1.6 * p.scale + d[1] * 0.6, p.z + d[2] * 0.6];
+  // Starts just in front of the face but within the player's radius, so it can't begin on the far side of a wall.
+  const eye = p.y + S.eyeHeight(p.x, p.y, p.z, p.scale);
+  const o = S.inBox(p.x + d[0] * 0.45, eye + d[1] * 0.45, p.z + d[2] * 0.45) ? [p.x, eye, p.z] : [p.x + d[0] * 0.45, eye + d[1] * 0.45, p.z + d[2] * 0.45];
   // Creamed players spray wildly, even if a hacked client hides the whipped cream.
   const spread = (W.spread || 0) + (now < p.blindUntil ? 0.6 : 0);
   for (let i = 0; i < (W.pellets || 1); i++) {
@@ -304,9 +350,28 @@ function fire(p, w, d) {
   }
 }
 
-function damage(v, a, amt, w, head) {
+// Does the victim's tray face the direction the hit came from? (dx,dz points from the victim toward the source.)
+function trayBlocks(v, dx, dz) {
+  if (!trayUp(v, Date.now())) return false;
+  const l = Math.hypot(dx, dz);
+  return l > 1e-6 && (-Math.sin(v.ry) * dx - Math.cos(v.ry) * dz) / l > S.TRAY.cone;
+}
+
+function hitTray(v, a, amt, W) {
+  v.trayHp = W.pierce ? 0 : Math.max(0, v.trayHp - amt);   // a sniper body shot shatters it, but is stopped
+  const broke = v.trayHp <= 0;
+  if (broke) v.trayBackAt = Date.now() + S.TRAY.respawnMs;
+  if (v.socket) { v.socket.emit('trayhit', { broke }); sendMe(v); }
+  if (a && a.socket) a.socket.emit('hitmark', { tray: 1, broke });
+}
+
+// from = [dx, dz] pointing from the victim toward where the hit came from (for the tray).
+function damage(v, a, amt, w, head, from) {
   if (v.dead) return;
-  if (!S.WEAPONS[w].pierce) amt *= 1 - S.OUTFITS[v.tier].res;
+  const W = S.WEAPONS[w];
+  if (a && S.canUpgrade(W)) amt *= 1 + S.DMG_STEP * a.dmgLv[w];
+  if (!head && from && trayBlocks(v, from[0], from[1])) return hitTray(v, a, amt, W);
+  if (!W.pierce) amt *= 1 - S.OUTFITS[v.tier].res;
   v.hp -= amt; v.lastHit = Date.now();
   if (v.socket) v.socket.emit('ouch', { w, hp: v.hp, head });
   if (a && a.socket) a.socket.emit('hitmark', { head });
@@ -315,13 +380,23 @@ function damage(v, a, amt, w, head) {
   let pts = 0;
   if (a && a !== v && (v.bot || Date.now() - v.lastActive < IDLE_MS)) {
     const amt = reward(a, v);
-    a.kills++; a.money += amt; a.earned += amt; sendMe(a);
+    a.kills++; a.money += amt; a.earned += amt;
+    if (amt > 0) a.wstains[w]++;   // farmed-out kills that pay nothing don't level up the weapon either
+    sendMe(a);
     if (session.phase === 'team' && a.team && v.team && a.team !== v.team) {
       pts = S.teamPoints(v.earned);
       a.teamPts += pts; session.scores[a.team - 1] += pts;
     }
   }
   io.emit('kill', { k: a ? a.name : '???', v: v.name, w, head, pts });
+  setTimeout(() => players.has(v.id) && v.dead && respawn(v), S.RESPAWN_MS);
+}
+
+// Too big a drop: instantly stained, no killer, no reward, tray or no tray.
+function fallDeath(v) {
+  if (v.dead) return;
+  v.hp = 0; v.dead = true; v.deaths++;
+  io.emit('kill', { k: 'Gravity', v: v.name, w: -1 });
   setTimeout(() => players.has(v.id) && v.dead && respawn(v), S.RESPAWN_MS);
 }
 
@@ -341,8 +416,9 @@ function endProjectile(pr, hitPlayer) {
     // Whipped cream: longer blind when close and looking toward it. Clients draw it; bots stop aiming.
     for (const p of players.values()) {
       if (p.id === pr.owner || p.dead || allies(p, owner)) continue;
-      const dx = pr.x - p.x, dz = pr.z - p.z, d = Math.hypot(dx, pr.y - p.y - 1.6 * p.scale, dz);
-      if (d > W.blind) continue;
+      const eye = p.y + S.eyeHeight(p.x, p.y, p.z, p.scale);
+      const dx = pr.x - p.x, dz = pr.z - p.z, d = Math.hypot(dx, pr.y - eye, dz);
+      if (d > W.blind || !S.lineClear(pr.x, pr.y, pr.z, p.x, eye, p.z)) continue;   // walls and floors stop the cream
       const facing = (-Math.sin(p.ry) * dx - Math.cos(p.ry) * dz) / (Math.hypot(dx, dz) || 1) > 0;
       const secs = (0.8 + 3.2 * (1 - d / W.blind)) * (facing ? 1 : 0.5);
       p.blindUntil = Date.now() + secs * 1000;
@@ -352,11 +428,13 @@ function endProjectile(pr, hitPlayer) {
     for (const p of players.values()) {
       if (p.id === pr.owner || p.dead || allies(p, owner)) continue;
       const d = S.distToPlayer(pr.x, pr.y, pr.z, p);
-      if (d < W.splash) damage(p, owner, W.dmg * (1 - d / W.splash * 0.7), pr.w);
+      // Walls and floors stop the blast, unless the player's chest or head is in the open.
+      if (d >= W.splash || !(S.lineClear(pr.x, pr.y, pr.z, p.x, p.y + 1, p.z) || S.lineClear(pr.x, pr.y, pr.z, p.x, p.y + 1.6, p.z))) continue;
+      damage(p, owner, W.dmg * (1 - d / W.splash * 0.7), pr.w, false, [pr.x - p.x, pr.z - p.z]);
     }
   } else if (hitPlayer) {
     const head = !!W.head && pr.y - hitPlayer.y > S.HEAD_Y * hitPlayer.scale;
-    damage(hitPlayer, owner, head ? W.head : W.dmg, pr.w, head);
+    damage(hitPlayer, owner, head ? W.head : W.dmg, pr.w, head, [-pr.vx, -pr.vz]);
   }
   io.emit('pop', { id: pr.id, w: pr.w, p: [+pr.x.toFixed(2), +Math.max(0, pr.y).toFixed(2), +pr.z.toFixed(2)] });
 }
@@ -371,7 +449,11 @@ function stepProjectiles(dt) {
       for (const p of players.values()) {
         if (p.id !== pr.owner && !p.dead && !allies(p, owner) && S.distToPlayer(pr.x, pr.y, pr.z, p) < 0.55 * p.scale + W.r) { endProjectile(pr, p); break outer; }
       }
-      if (pr.t > W.life || S.inBox(pr.x, pr.y, pr.z) || Math.abs(pr.x) > S.ARENA || Math.abs(pr.z) > S.ARENA) { endProjectile(pr); break; }
+      if (S.inBox(pr.x, pr.y, pr.z)) {   // back up to the near side of the wall, so the blast goes off on this side of it
+        pr.x -= pr.vx * sdt; pr.y -= pr.vy * sdt; pr.z -= pr.vz * sdt;
+        endProjectile(pr); break;
+      }
+      if (pr.t > W.life || Math.abs(pr.x) > S.ARENA || Math.abs(pr.z) > S.ARENA) { endProjectile(pr); break; }
     }
   }
 }
@@ -397,6 +479,7 @@ function stepBot(b, dt) {
   }
   b.ry += ai.spin * dt;
   S.move(b, ai.walk ? Math.sin(ai.dir) : 0, ai.walk ? Math.cos(ai.dir) : 0, ai.jumpy && Math.random() < 0.1, dt);
+  if (trackFall(b, b.onGround, b.y, b.y)) return;
   if (Math.random() < (ai.w === 0 ? 0.3 : 0.03)) {
     let d = [Math.random() - 0.5, Math.random() * 0.3, Math.random() - 0.5];
     if (Math.random() < 0.4 && Date.now() > b.blindUntil) {   // occasionally aim at someone (badly), unless creamed
@@ -429,6 +512,9 @@ io.on('connection', (socket) => {
   socket.on('fire', (m) => { if (m && Number.isInteger(m.w) && vec3(m.d)) fire(p, m.w, m.d); });
   socket.on('buy', (tier) => { if (Number.isInteger(tier)) buyOutfit(p, tier); });
   socket.on('buyw', (w) => { if (Number.isInteger(w)) buyWeapon(p, w); });
+  socket.on('buyup', (w) => { if (Number.isInteger(w)) buyUpgrade(p, w); });
+  socket.on('buytray', () => buyTray(p));
+  socket.on('equip', (w) => { if (Number.isInteger(w)) equip(p, w); });
   socket.on('disconnect', () => {
     players.delete(p.id);
     const n = ipCount.get(ip) - 1;
@@ -445,12 +531,13 @@ setInterval(() => {
   for (const p of players.values()) {
     if (p.bot) stepBot(p, TICK);
     if (!p.dead && now - p.lastHit > 5000) p.hp = Math.min(S.MAX_HP, p.hp + 10 * TICK);
+    if (p.hasTray && p.trayHp <= 0 && now >= p.trayBackAt) { p.trayHp = S.TRAY.hp; sendMe(p); }
     p.earn = Math.min(EARN_MAX, p.earn + EARN_PER_SEC * TICK);
   }
   stepProjectiles(TICK);
   if (++tickN % 3 !== 0) {   // ~20Hz snapshots
     const r = (n) => Math.round(n * 100) / 100;
-    io.emit('snap', [...players.values()].map(p => [p.id, r(p.x), r(p.y), r(p.z), r(p.ry), p.tier, Math.ceil(p.hp), p.dead ? 1 : 0]));
+    io.emit('snap', [...players.values()].map(p => [p.id, r(p.x), r(p.y), r(p.z), r(p.ry), p.tier, Math.ceil(p.hp), p.dead ? 1 : 0, trayUp(p, now) ? 1 : 0]));
   }
   if (tickN % 30 === 0) for (const p of players.values()) p.msgs = 0;   // per-second message budget
   if (tickN % 30 === 0) {

@@ -28,6 +28,7 @@ button:disabled { background: #888; cursor: default; }
 #stats { font-size: 22px; margin-top: 6px; }
 #money { color: #6f6; }
 #outfit { font-size: 16px; margin-top: 4px; }
+#tray { font-size: 16px; margin-top: 4px; color: #7ff; }
 .sw { display: inline-block; width: 14px; height: 14px; border: 2px solid #000; border-radius: 4px; vertical-align: middle; margin-right: 2px; }
 #weapons { margin-top: 6px; display: flex; gap: 6px; }
 #weapons div { background: rgba(0,0,0,0.4); padding: 4px 8px; border-radius: 8px; border: 2px solid transparent; font-size: 14px; }
@@ -62,6 +63,7 @@ button:disabled { background: #888; cursor: default; }
 .item .nm { flex: 1; }
 .item button { font-size: 15px; padding: 4px 12px; }
 .item.cur { outline: 3px solid #ffe600; }
+.item .lv { color: #ffe600; }
 
 /* Hotdog scope */
 #scope { position: fixed; inset: 0; display: none; pointer-events: none; background: radial-gradient(circle at center, transparent 0 26vmin, #3a1c06 26.5vmin); }

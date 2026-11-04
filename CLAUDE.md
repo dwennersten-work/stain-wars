@@ -16,6 +16,7 @@ Admin: `curl localhost:3000/admin/status`, `/admin/newgame?ffa=15&team=5` (minut
 ## Conventions
 - Keep it simple: MVP quality, minimal error checking, no build tooling, no extra dependencies.
 - Units: meters; player position = feet; y up. Server ticks at 30Hz and broadcasts at 20Hz.
+- The map is boxes with a bottom (`y`) and a `top`, in `S.BOXES`. Keep walls and floors at least 0.4m thick so shots and moves can't tunnel through (see `decisions.md`).
 - Record any important new decision in `decisions.md`. Put new ideas in `TODO.md`.
 
 ## Security rules (see `decisions.md` → Security)

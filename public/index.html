@@ -26,10 +26,11 @@
     <div id="hpWrap"><div id="hpBar"></div><span id="hpText">Cleanliness 100%</span></div>
     <div id="stats"><span id="money">$0</span> · <span id="kills">0 stains</span></div>
     <div id="outfit"></div>
+    <div id="tray" class="hidden"></div>
     <div id="owlInfo" class="hidden"></div>
     <div id="weaponName"></div>
     <div id="weapons"></div>
-    <div class="hint">[B] Shop: food weapons &amp; outfits · [G] Whipped cream bomb</div>
+    <div class="hint">[B] Shop · [G] Whipped cream bomb · [Space] twice to double jump</div>
   </div>
 
   <div id="popup"></div>
@@ -38,9 +39,9 @@
     <div class="panel">
       <h1>🍔 STAIN WARS 🌭</h1>
       <p>You are <b id="myName">...</b></p>
-      <p class="small">Stain other players with condiments to win money.<br>Buy new food weapons and WILDER outfits in the shop. You keep everything you buy!<br>Wilder outfit = more stain resistance = worth more money to defeat.<br>🦉 In the final minutes everyone becomes an owl on one of two teams. The more you've earned, the bigger your owl!</p>
+      <p class="small">Stain other players with condiments to win money.<br>Buy new food weapons and WILDER outfits in the shop. You keep everything you buy!<br>Wilder outfit = more stain resistance = worth more money to defeat.<br>⭐ Stains with a weapon level it up, so you can buy it more damage.<br>🏢 Climb the stairs and snipe from the roofs, but a drop of more than 5 times your height stains you instantly!<br>🦉 In the final minutes everyone becomes an owl on one of two teams. The more you've earned, the bigger your owl!</p>
       <table class="small controls">
-        <tr><td>Move / Jump</td><td>WASD / Space</td></tr>
+        <tr><td>Move / Jump</td><td>WASD / Space (twice to double jump)</td></tr>
         <tr><td>Aim / Shoot</td><td>Mouse / Click</td></tr>
         <tr><td>Weapons</td><td>1-6 or Q</td></tr>
         <tr><td>Hotdog scope</td><td>Right-click or Shift (Ketchup Sniper)</td></tr>
@@ -56,6 +57,7 @@
       <h2>🛒 Snack Shack <span id="shopMoney"></span></h2>
       <div id="shopBody">
         <h3>🍔 Food Weapons</h3><div id="shopFood"></div>
+        <h3>🍽️ Gear</h3><div id="shopGear"></div>
         <h3>👗 Outfits <small>(unlock one level at a time)</small></h3><div id="shopList"></div>
       </div>
       <button id="shopClose">Back to the fight [B]</button>

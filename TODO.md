@@ -49,7 +49,24 @@
 - [x] Two team leaderboards, game clock, score display, final results screen
 - [ ] Playtest with a real class: owl size range, team points, whether giant owls see too far over boxes
 
+## Phase 6 — Buildings & progression
+- [x] Map doubled to 160m × 160m; fog, camera range and sniper range to match
+- [x] 3D collision (floors, ceilings, stairs), with a grid so about 2,000 boxes stay cheap
+- [x] Hollow low-poly buildings with stairs, rooms, windows and walled roofs, plus 4 sniper lookouts
+- [x] Double jump
+- [x] Instant stain on a drop over 5× your height (server-side)
+- [x] Cafeteria Tray shield: front only, one-handed food only, back 5s after breaking
+- [x] Weapon levels and buyable +5% damage upgrades, priced like outfits
+- [x] Blasts and cream stopped by walls; name tags hidden by walls
+- [x] Server anti-cheat updated: double jump, floors, ceilings, long falls
+- [ ] Playtest with a real class: map size, tray price/HP, level thresholds, whether lookouts are too strong
+- [ ] Check frame rate on real school laptops (tested only on a software renderer so far)
+
 ## Later (ideas, not started)
+- [ ] Minimap or compass, now that the map is bigger
+- [ ] Teach bots to use stairs (today they only wander up by accident)
+- [ ] Bridges between rooftops
+- [ ] Warning when you're about to take a fatal drop
 - [ ] Rebalance teams if many players leave during the Showdown
 - [ ] Web admin dashboard `/admin`: live CPU/RAM/network/player-count graphs for screensharing
 - [ ] Show "cost per player" (CPU %/bandwidth per connected player)

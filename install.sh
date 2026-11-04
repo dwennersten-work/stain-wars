@@ -2,8 +2,10 @@
 # Stain Wars installer for a fresh Ubuntu droplet. Run as root:
 #   curl -fsSL https://raw.githubusercontent.com/dwennersten-work/stain-wars/main/install.sh | bash
 # Re-running it updates to the latest version.
+# To test a branch instead of main, pipe into: BRANCH=<branch-name> bash
 set -e
 REPO=https://github.com/dwennersten-work/stain-wars.git
+BRANCH=${BRANCH:-main}
 DIR=/opt/stainwars
 
 echo "== Installing packages (node, git, htop) =="
@@ -14,8 +16,14 @@ if ! command -v node >/dev/null || [ "$(node -v | cut -c2- | cut -d. -f1)" -lt 1
   apt-get install -y nodejs
 fi
 
-echo "== Getting the game =="
-if [ -d "$DIR/.git" ]; then git -C "$DIR" pull --ff-only; else git clone "$REPO" "$DIR"; fi
+echo "== Getting the game ($BRANCH) =="
+if [ -d "$DIR/.git" ]; then
+  git -C "$DIR" fetch origin
+  git -C "$DIR" checkout "$BRANCH"
+  git -C "$DIR" pull --ff-only
+else
+  git clone --branch "$BRANCH" "$REPO" "$DIR"
+fi
 cd "$DIR" && npm ci --omit=dev   # exact versions from package-lock.json
 
 echo "== Setting up service =="

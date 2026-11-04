@@ -1,6 +1,6 @@
 # 🍔 Stain Wars 🌭
 
-A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. Students join with a link and start with a mustard squirter, then spend their winnings on soda shotguns, spaghetti whips, hamburger grenades, pie launchers, a ketchup sniper (with a hotdog scope), whipped cream "flashbangs", and wilder, more stain-resistant outfits. Meanwhile, the teacher shows the VM working hard in `htop`.
+A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. Students join with a link and start with a mustard squirter, then spend their winnings on soda shotguns, spaghetti whips, hamburger grenades, pie launchers, a ketchup sniper (with a hotdog scope), whipped cream "flashbangs", a cafeteria tray shield, weapon damage upgrades, and wilder, more stain-resistant outfits. The map has buildings to explore and rooftops to snipe from. Meanwhile, the teacher shows the VM working hard in `htop`.
 
 ## Install on a DigitalOcean droplet
 1. Create a droplet: **Ubuntu 24.04, Basic, Regular, $6/mo (1 vCPU / 1 GB)**. It costs about $0.009/hour, so delete it when class is done.
@@ -9,6 +9,12 @@ A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. 
    curl -fsSL https://raw.githubusercontent.com/dwennersten-work/stain-wars/main/install.sh | bash
    ```
 3. Give students `http://<droplet-ip>`.
+
+To try out a branch before it goes to `main`, use that branch's script and name the branch:
+```bash
+curl -fsSL https://raw.githubusercontent.com/dwennersten-work/stain-wars/<branch>/install.sh | BRANCH=<branch> bash
+```
+Re-run it to get newer commits from that branch. To go back, run the normal install command above.
 
 ## During class
 | Command | What it does |
@@ -31,7 +37,12 @@ A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. 
 Until you run `stainwars newgame`, it's endless free play and no timer runs. A game starts everyone from zero as a free-for-all. For the Owl Showdown, everyone is split into two fair teams and becomes a Barn Owl or a Great Horned Owl, sized by the stains (money) they've earned this game. Eliminating an enemy scores your team their earnings ÷ 20, rounded up. The higher team score wins.
 
 ## Controls
-WASD + Space to move and jump · mouse to aim · click to shoot · 1-6 or Q to switch weapons · right-click or Shift for the hotdog scope · G to throw a whipped cream bomb · B for the shop.
+WASD + Space to move and jump (press Space again in the air to double jump) · mouse to aim · click to shoot · 1-6 or Q to switch weapons · right-click or Shift for the hotdog scope · G to throw a whipped cream bomb · B for the shop.
+
+## Good to know
+- **Falls:** a drop of more than 5× your height (10m) stains you instantly. Three-story roofs and the corner lookouts are that high, so take the stairs down.
+- **Cafeteria Tray ($120):** blocks hits from the front while you hold one-handed food (not the Soda Shotgun or Ketchup Sniper). It comes back 5 seconds after it breaks.
+- **Weapon levels:** stains with a weapon level it up. Each level unlocks a +5% damage upgrade in the shop, up to +25%. The price matches the same step of stain resistance, so upgrades and outfits balance out.
 
 ## Run locally
 ```bash
