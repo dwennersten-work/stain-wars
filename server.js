@@ -19,6 +19,8 @@ const ipCount = new Map();
 const players = new Map();   // id -> player
 const projectiles = new Map();
 let nextId = 1;
+// Game session: free -> ffa -> team -> ended -> free. 'free' is endless play with no timer, waiting for the teacher.
+const session = { phase: 'free', endsAt: 0, teamMs: 0, scores: [0, 0], results: null };
 
 // ---------- HTTP: static files + localhost-only admin ----------
 const server = http.createServer((req, res) => {
@@ -41,9 +43,20 @@ const server = http.createServer((req, res) => {
 function admin(url, res) {
   const cmd = url.pathname.slice(7);
   let msg;
-  if (cmd === 'reset') {
-    for (const p of players.values()) { Object.assign(p, startKit(p.bot), { money: 0, kills: 0, deaths: 0 }); respawn(p); sendMe(p); }
-    msg = 'Everyone reset to Plain Beige Tee, mustard only, $0, 0 kills.';
+  if (cmd === 'newgame') {
+    const mins = (k, def) => { const n = parseFloat(url.searchParams.get(k)); return Number.isFinite(n) ? Math.max(0, Math.min(180, n)) : def; };
+    const ffa = mins('ffa', S.FFA_MIN), team = mins('team', S.TEAM_MIN);
+    if (ffa + team > 0) { startGame(ffa * 60000, team * 60000); msg = `New game: ${ffa} min free-for-all + ${team} min Owl Showdown. Everyone starts fresh.`; }
+    else msg = 'A game needs some time: newgame <ffaMinutes> <teamMinutes>';
+  } else if (cmd === 'skip') {
+    if (session.phase === 'free') msg = 'No game running.'; else { advance(); msg = 'Skipped to the next phase.'; }
+  } else if (cmd === 'stop') {
+    freePlay();
+    msg = 'Game stopped. Back to free play (everyone keeps their stuff).';
+  } else if (cmd === 'reset') {
+    resetAll();
+    setPhase('free', 0);
+    msg = 'Game stopped. Everyone reset to Plain Beige Tee, mustard only, $0, 0 kills.';
   } else if (cmd === 'bots') {
     const n = Math.min(100, parseInt(url.searchParams.get('n')) || 10);
     for (let i = 0; i < n; i++) addBot();
@@ -51,7 +64,7 @@ function admin(url, res) {
   } else if (cmd === 'nobots') {
     for (const p of players.values()) if (p.bot) players.delete(p.id);
     msg = 'All bots removed.';
-  } else msg = 'commands: reset | bots?n=10 | nobots | status';
+  } else if (cmd !== 'status') msg = 'commands: newgame?ffa=15&team=5 | skip | stop | reset | bots?n=10 | nobots | status';
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end((msg ? msg + '\n' : '') + status() + '\n');
 }
@@ -59,7 +72,8 @@ function admin(url, res) {
 function status() {
   const all = [...players.values()];
   const mem = process.memoryUsage().rss / 1048576;
-  return `humans=${all.filter(p => !p.bot).length} bots=${all.filter(p => p.bot).length} projectiles=${projectiles.size} memMB=${mem.toFixed(0)}`;
+  const left = session.endsAt ? Math.ceil((session.endsAt - Date.now()) / 1000) + 's' : '-';
+  return `phase=${session.phase} left=${left} score=${session.scores.join('-')} humans=${all.filter(p => !p.bot).length} bots=${all.filter(p => p.bot).length} projectiles=${projectiles.size} memMB=${mem.toFixed(0)}`;
 }
 
 // ---------- Players ----------
@@ -77,9 +91,10 @@ function startKit(bot) {
 
 function newPlayer(bot, socket) {
   const p = { id: nextId++, name: pickName(bot), bot, socket, ...S.randomSpawn(), vy: 0, ry: 0, ...startKit(bot),
-    hp: S.MAX_HP, money: 0, kills: 0, deaths: 0, dead: false, lastFire: S.WEAPONS.map(() => 0), lastShot: 0, lastHit: 0,
+    hp: S.MAX_HP, money: 0, earned: 0, kills: 0, deaths: 0, team: 0, scale: 1, teamPts: 0, dead: false, lastFire: S.WEAPONS.map(() => 0), lastShot: 0, lastHit: 0,
     blindUntil: 0, msgs: 0, lastFix: 0, lastActive: Date.now(), farm: new Map(), earn: 200 };
   resetMove(p);
+  if (session.phase === 'team') { p.team = weakerTeam(); p.scale = S.OWL_MIN; }   // latecomers even out the teams
   players.set(p.id, p);
   return p;
 }
@@ -144,7 +159,7 @@ function clientMove(p, a) {
 }
 
 function sendMe(p) {
-  if (p.socket) p.socket.emit('me', { money: p.money, tier: p.tier, kills: p.kills, ammo: p.ammo, owned: p.owned.map(Number) });
+  if (p.socket) p.socket.emit('me', { money: p.money, earned: p.earned, tier: p.tier, kills: p.kills, ammo: p.ammo, owned: p.owned.map(Number) });
 }
 
 // Outfits: only the next level up. Weapons: once each. Cream bombs: a pack at a time, capped.
@@ -163,11 +178,110 @@ function buyWeapon(p, w) {
   p.money -= W.cost; sendMe(p);
 }
 
+// ---------- Game session ----------
+function setPhase(phase, ms) {
+  session.phase = phase;
+  session.endsAt = ms ? Date.now() + ms : 0;
+  sendBoard();
+}
+
+function resetAll() {
+  for (const p of players.values()) {
+    Object.assign(p, startKit(p.bot), { money: 0, earned: 0, kills: 0, deaths: 0, team: 0, scale: 1, teamPts: 0, farm: new Map(), earn: 200, blindUntil: 0 });
+    respawn(p); sendMe(p);
+  }
+  projectiles.clear();
+  session.scores = [0, 0]; session.results = null;
+}
+
+function startGame(ffaMs, teamMs) {
+  resetAll();
+  session.teamMs = teamMs;
+  if (ffaMs > 0) setPhase('ffa', ffaMs); else startTeams();
+}
+
+const power = (p) => p.earned + 25 * p.tier;   // how strong a player is, for picking fair teams
+
+function teamTotals() {
+  const size = [0, 0], total = [0, 0];
+  for (const p of players.values()) if (p.team) { size[p.team - 1]++; total[p.team - 1] += power(p); }
+  return { size, total };
+}
+
+// Team number (1 or 2) a newcomer should join: fewer players first, then less total strength.
+function weakerTeam() {
+  const { size, total } = teamTotals();
+  if (size[0] !== size[1]) return size[0] < size[1] ? 1 : 2;
+  if (total[0] !== total[1]) return total[0] < total[1] ? 1 : 2;
+  return Math.random() < 0.5 ? 1 : 2;
+}
+
+// Random but fair: rank by strength (with some jitter so it isn't the same split every time) and deal out
+// neighbors in pairs, giving the stronger of each pair to the team that's behind. Humans are split first
+// so bots can't pile all the students onto one side.
+function assignTeams() {
+  const all = [...players.values()];
+  for (const p of all) p.team = 0;
+  for (const group of [all.filter(p => !p.bot), all.filter(p => p.bot)]) {
+    const ranked = group.map(p => [p, power(p) * (0.9 + Math.random() * 0.2) + Math.random()]).sort((a, b) => b[1] - a[1]).map(r => r[0]);
+    for (let i = 0; i < ranked.length; i += 2) {
+      const behind = weakerTeam();
+      ranked[i].team = behind;
+      if (ranked[i + 1]) ranked[i + 1].team = 3 - behind;
+    }
+  }
+}
+
+function updateOwlSizes() {
+  let top = 0;
+  for (const p of players.values()) top = Math.max(top, p.earned);
+  for (const p of players.values()) p.scale = p.team ? Math.round(S.owlScale(p.earned, top) * 100) / 100 : 1;
+}
+
+function startTeams() {
+  assignTeams();
+  updateOwlSizes();
+  projectiles.clear();
+  for (const p of players.values()) respawn(p);   // everyone starts the showdown fresh
+  setPhase('team', session.teamMs);
+}
+
+function endGame() {
+  const all = [...players.values()], [a, b] = session.scores, hadTeams = all.some(p => p.team);
+  const mvp = (t) => { const best = all.filter(p => p.team === t).sort((x, y) => y.teamPts - x.teamPts)[0]; return best ? [best.name, best.teamPts] : null; };
+  session.results = {
+    winner: !hadTeams ? null : a === b ? -1 : a > b ? 0 : 1, scores: [a, b], mvp: [mvp(1), mvp(2)],
+    top: all.sort((x, y) => y.earned - x.earned).slice(0, 3).map(p => [p.name, p.earned]),
+  };
+  projectiles.clear();
+  setPhase('ended', S.RESULTS_MS);
+}
+
+function freePlay() {
+  for (const p of players.values()) Object.assign(p, { team: 0, scale: 1, teamPts: 0 });
+  session.scores = [0, 0]; session.results = null;
+  setPhase('free', 0);
+}
+
+function advance() {
+  if (session.phase === 'ffa') { if (session.teamMs > 0) startTeams(); else endGame(); }
+  else if (session.phase === 'team') endGame();
+  else if (session.phase === 'ended') freePlay();
+}
+
+// Sent once a second and on every phase change. Team and owl size live here (not in the 20Hz snapshot) to save bandwidth.
+function sendBoard() {
+  io.emit('board', { phase: session.phase, left: session.endsAt ? session.endsAt - Date.now() : 0, teamNext: session.teamMs > 0, scores: session.scores, results: session.results,
+    list: [...players.values()].map(p => [p.id, p.name, p.tier, p.kills, p.money, p.bot ? 1 : 0, p.team, p.scale, p.teamPts]) });
+}
+
 // ---------- Combat ----------
+const allies = (a, b) => !!(a && b && a.team && a.team === b.team);   // no friendly fire in the Owl Showdown
+
 // Clients only choose weapon + aim direction. Origin, cooldown, ownership and spread are all server-side.
 function fire(p, w, d) {
   const W = S.WEAPONS[w], now = Date.now();
-  if (!W || p.dead || !p.owned[w] && !(W.pack && p.ammo > 0) || now - p.lastFire[w] < W.cd * 1000 * 0.9) return;
+  if (!W || p.dead || session.phase === 'ended' || !p.owned[w] && !(W.pack && p.ammo > 0) || now - p.lastFire[w] < W.cd * 1000 * 0.9) return;
   // Like the real client, guns share one cooldown: no firing sniper + pie + burger in the same instant.
   if (!W.pack && now - p.lastShot < W.cd * 1000 * 0.9) return;
   const len = Math.hypot(...d);
@@ -176,7 +290,7 @@ function fire(p, w, d) {
   p.lastFire[w] = now; p.lastActive = now;
   if (W.pack) { p.ammo--; sendMe(p); } else p.lastShot = now;
   // Always fire from the server's copy of the player's eyes, so nobody can shoot from behind a wall.
-  const o = [p.x + d[0] * 0.6, p.y + 1.6 + d[1] * 0.6, p.z + d[2] * 0.6];
+  const o = [p.x + d[0] * 0.6, p.y + 1.6 * p.scale + d[1] * 0.6, p.z + d[2] * 0.6];
   // Creamed players spray wildly, even if a hacked client hides the whipped cream.
   const spread = (W.spread || 0) + (now < p.blindUntil ? 0.6 : 0);
   for (let i = 0; i < (W.pellets || 1); i++) {
@@ -198,9 +312,17 @@ function damage(v, a, amt, w, head) {
   if (a && a.socket) a.socket.emit('hitmark', { head });
   if (v.hp > 0) return;
   v.dead = true; v.deaths++;
-  if (a && a !== v && (v.bot || Date.now() - v.lastActive < IDLE_MS)) { a.kills++; a.money += reward(a, v); sendMe(a); }
-  io.emit('kill', { k: a ? a.name : '???', v: v.name, w, head });
-  setTimeout(() => players.has(v.id) && respawn(v), S.RESPAWN_MS);
+  let pts = 0;
+  if (a && a !== v && (v.bot || Date.now() - v.lastActive < IDLE_MS)) {
+    const amt = reward(a, v);
+    a.kills++; a.money += amt; a.earned += amt; sendMe(a);
+    if (session.phase === 'team' && a.team && v.team && a.team !== v.team) {
+      pts = S.teamPoints(v.earned);
+      a.teamPts += pts; session.scores[a.team - 1] += pts;
+    }
+  }
+  io.emit('kill', { k: a ? a.name : '???', v: v.name, w, head, pts });
+  setTimeout(() => players.has(v.id) && v.dead && respawn(v), S.RESPAWN_MS);
 }
 
 function reward(a, v) {
@@ -218,8 +340,8 @@ function endProjectile(pr, hitPlayer) {
   if (W.blind) {
     // Whipped cream: longer blind when close and looking toward it. Clients draw it; bots stop aiming.
     for (const p of players.values()) {
-      if (p.id === pr.owner || p.dead) continue;
-      const dx = pr.x - p.x, dz = pr.z - p.z, d = Math.hypot(dx, pr.y - p.y - 1.6, dz);
+      if (p.id === pr.owner || p.dead || allies(p, owner)) continue;
+      const dx = pr.x - p.x, dz = pr.z - p.z, d = Math.hypot(dx, pr.y - p.y - 1.6 * p.scale, dz);
       if (d > W.blind) continue;
       const facing = (-Math.sin(p.ry) * dx - Math.cos(p.ry) * dz) / (Math.hypot(dx, dz) || 1) > 0;
       const secs = (0.8 + 3.2 * (1 - d / W.blind)) * (facing ? 1 : 0.5);
@@ -228,12 +350,12 @@ function endProjectile(pr, hitPlayer) {
     }
   } else if (W.splash) {
     for (const p of players.values()) {
-      if (p.id === pr.owner || p.dead) continue;
+      if (p.id === pr.owner || p.dead || allies(p, owner)) continue;
       const d = S.distToPlayer(pr.x, pr.y, pr.z, p);
       if (d < W.splash) damage(p, owner, W.dmg * (1 - d / W.splash * 0.7), pr.w);
     }
   } else if (hitPlayer) {
-    const head = !!W.head && pr.y - hitPlayer.y > S.HEAD_Y;
+    const head = !!W.head && pr.y - hitPlayer.y > S.HEAD_Y * hitPlayer.scale;
     damage(hitPlayer, owner, head ? W.head : W.dmg, pr.w, head);
   }
   io.emit('pop', { id: pr.id, w: pr.w, p: [+pr.x.toFixed(2), +Math.max(0, pr.y).toFixed(2), +pr.z.toFixed(2)] });
@@ -242,12 +364,12 @@ function endProjectile(pr, hitPlayer) {
 function stepProjectiles(dt) {
   for (const pr of projectiles.values()) {
     const W = S.WEAPONS[pr.w];
-    const steps = Math.ceil(W.speed * dt / 0.4), sdt = dt / steps;
+    const steps = Math.ceil(W.speed * dt / 0.4), sdt = dt / steps, owner = players.get(pr.owner);
     outer: for (let i = 0; i < steps; i++) {
       pr.vy -= W.grav * sdt;
       pr.x += pr.vx * sdt; pr.y += pr.vy * sdt; pr.z += pr.vz * sdt; pr.t += sdt;
       for (const p of players.values()) {
-        if (p.id !== pr.owner && !p.dead && S.distToPlayer(pr.x, pr.y, pr.z, p) < 0.55 + W.r) { endProjectile(pr, p); break outer; }
+        if (p.id !== pr.owner && !p.dead && !allies(p, owner) && S.distToPlayer(pr.x, pr.y, pr.z, p) < 0.55 * p.scale + W.r) { endProjectile(pr, p); break outer; }
       }
       if (pr.t > W.life || S.inBox(pr.x, pr.y, pr.z) || Math.abs(pr.x) > S.ARENA || Math.abs(pr.z) > S.ARENA) { endProjectile(pr); break; }
     }
@@ -281,7 +403,7 @@ function stepBot(b, dt) {
       let best, bd = 30;
       for (const p of players.values()) {
         const dd = Math.hypot(p.x - b.x, p.z - b.z);
-        if (p !== b && !p.dead && dd < bd) { bd = dd; best = p; }
+        if (p !== b && !p.dead && !allies(p, b) && dd < bd) { bd = dd; best = p; }
       }
       if (best) d = [best.x - b.x + (Math.random() - 0.5) * 6, best.y - b.y + Math.random() * 2, best.z - b.z + (Math.random() - 0.5) * 6];
     }
@@ -319,6 +441,7 @@ const TICK = 1 / 30;
 let tickN = 0;
 setInterval(() => {
   const now = Date.now();
+  if (session.endsAt && now >= session.endsAt) advance();
   for (const p of players.values()) {
     if (p.bot) stepBot(p, TICK);
     if (!p.dead && now - p.lastHit > 5000) p.hp = Math.min(S.MAX_HP, p.hp + 10 * TICK);
@@ -330,7 +453,10 @@ setInterval(() => {
     io.emit('snap', [...players.values()].map(p => [p.id, r(p.x), r(p.y), r(p.z), r(p.ry), p.tier, Math.ceil(p.hp), p.dead ? 1 : 0]));
   }
   if (tickN % 30 === 0) for (const p of players.values()) p.msgs = 0;   // per-second message budget
-  if (tickN % 30 === 0) io.emit('board', [...players.values()].map(p => [p.id, p.name, p.tier, p.kills, p.money, p.bot ? 1 : 0]));
+  if (tickN % 30 === 0) {
+    if (session.phase === 'team') updateOwlSizes();
+    sendBoard();
+  }
 }, TICK * 1000);
 
 setInterval(() => console.log(new Date().toISOString(), status()), 30000);

@@ -3,6 +3,9 @@
 PORT=${PORT:-80}
 URL=http://127.0.0.1:$PORT/admin
 case "$1" in
+  newgame) curl -s "$URL/newgame?ffa=${2:-15}&team=${3:-5}" ;;
+  skip)   curl -s "$URL/skip" ;;
+  stop)   curl -s "$URL/stop" ;;
   status) curl -s "$URL/status" ;;
   bots)   curl -s "$URL/bots?n=${2:-10}" ;;
   nobots) curl -s "$URL/nobots" ;;
@@ -10,5 +13,5 @@ case "$1" in
   logs)   journalctl -u stainwars -f ;;
   restart) systemctl restart stainwars && echo restarted ;;
   update) curl -fsSL https://raw.githubusercontent.com/dwennersten-work/stain-wars/main/install.sh | bash ;;
-  *) echo "usage: stainwars status | bots [N] | nobots | reset | logs | restart | update" ;;
+  *) echo "usage: stainwars newgame [ffaMin] [teamMin] | skip | stop | status | bots [N] | nobots | reset | logs | restart | update" ;;
 esac

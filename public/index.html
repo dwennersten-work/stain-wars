@@ -15,12 +15,18 @@
   <div id="hitmark">✕</div>
 
   <div id="killfeed"></div>
+  <div id="clock"><div id="clockText"></div><div id="teamScore" class="hidden"></div></div>
   <div id="board"><h3>🏆 Leaderboard</h3><ol id="boardList"></ol></div>
+  <div id="teamBoards" class="hidden">
+    <div class="teamBoard"><h3 id="team1Head"></h3><ol id="team1List"></ol></div>
+    <div class="teamBoard"><h3 id="team2Head"></h3><ol id="team2List"></ol></div>
+  </div>
 
   <div id="hud">
     <div id="hpWrap"><div id="hpBar"></div><span id="hpText">Cleanliness 100%</span></div>
     <div id="stats"><span id="money">$0</span> · <span id="kills">0 stains</span></div>
     <div id="outfit"></div>
+    <div id="owlInfo" class="hidden"></div>
     <div id="weaponName"></div>
     <div id="weapons"></div>
     <div class="hint">[B] Shop: food weapons &amp; outfits · [G] Whipped cream bomb</div>
@@ -32,7 +38,7 @@
     <div class="panel">
       <h1>🍔 STAIN WARS 🌭</h1>
       <p>You are <b id="myName">...</b></p>
-      <p class="small">Stain other players with condiments to win money.<br>Buy new food weapons and WILDER outfits in the shop. You keep everything you buy!<br>Wilder outfit = more stain resistance = worth more money to defeat.</p>
+      <p class="small">Stain other players with condiments to win money.<br>Buy new food weapons and WILDER outfits in the shop. You keep everything you buy!<br>Wilder outfit = more stain resistance = worth more money to defeat.<br>🦉 In the final minutes everyone becomes an owl on one of two teams. The more you've earned, the bigger your owl!</p>
       <table class="small controls">
         <tr><td>Move / Jump</td><td>WASD / Space</td></tr>
         <tr><td>Aim / Shoot</td><td>Mouse / Click</td></tr>
@@ -55,6 +61,8 @@
       <button id="shopClose">Back to the fight [B]</button>
     </div>
   </div>
+
+  <div id="results" class="overlay hidden"><div class="panel"><h1 id="resultsHead"></h1><div id="resultsBody"></div></div></div>
 
   <div id="dead" class="overlay hidden"><div class="panel"><h1>🤢 STAINED!</h1><p id="deadMsg"></p></div></div>
 

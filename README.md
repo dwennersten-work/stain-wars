@@ -14,14 +14,21 @@ A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. 
 | Command | What it does |
 |---|---|
 | `htop` | Live CPU/RAM. Screenshare this. |
-| `stainwars status` | Humans, bots, projectiles in flight, server memory |
+| `stainwars newgame` | Start a fresh 20-minute game: 15 min free-for-all, then a 5 min team Owl Showdown |
+| `stainwars newgame 10 3` | Custom times: 10 min free-for-all + 3 min Owl Showdown (`newgame 0 5` skips straight to owls) |
+| `stainwars skip` | Jump to the next phase now |
+| `stainwars stop` | End the game, back to free play (everyone keeps their stuff) |
+| `stainwars status` | Game phase, time left, team score, humans, bots, projectiles in flight, server memory |
 | `stainwars bots 20` | Add 20 derpy bots (more load!) |
 | `stainwars nobots` | Remove bots |
-| `stainwars reset` | Everyone back to Plain Beige Tee and $0 |
+| `stainwars reset` | Stop any game; everyone back to Plain Beige Tee and $0 |
 | `stainwars logs` | Follow the server log |
 | `stainwars update` | Pull the latest version and restart |
 
 **Lesson idea:** start with no one connected and look at `htop`. Let students join and watch CPU go up. Then run `stainwars bots 50` and watch it climb more.
+
+## How a game works
+Until you run `stainwars newgame`, it's endless free play and no timer runs. A game starts everyone from zero as a free-for-all. For the Owl Showdown, everyone is split into two fair teams and becomes a Barn Owl or a Great Horned Owl, sized by the stains (money) they've earned this game. Eliminating an enemy scores your team their earnings ÷ 20, rounded up. The higher team score wins.
 
 ## Controls
 WASD + Space to move and jump · mouse to aim · click to shoot · 1-6 or Q to switch weapons · right-click or Shift for the hotdog scope · G to throw a whipped cream bomb · B for the shop.

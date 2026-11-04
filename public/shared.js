@@ -24,6 +24,23 @@
   ];
   S.killReward = (victimTier) => 20 + 15 * victimTier;
 
+  // A game session: a free-for-all, then a team "Owl Showdown". Teacher can override both: stainwars newgame 15 5
+  S.FFA_MIN = 15;
+  S.TEAM_MIN = 5;
+  S.RESULTS_MS = 30000;    // how long the final results stay up before free play resumes
+  // Owl size is linear in stains earned (total money earned this game), relative to the top earner.
+  // The hitbox and eye height scale too, so the biggest owl is the biggest (and most valuable) target.
+  S.OWL_MIN = 0.8;
+  S.OWL_MAX = 2.5;
+  S.OWL_TOP_FLOOR = 100;   // nobody looks giant until someone has earned at least this much
+  S.owlScale = (earned, topEarned) => S.OWL_MIN + (S.OWL_MAX - S.OWL_MIN) * earned / Math.max(topEarned, S.OWL_TOP_FLOOR);
+  // Team points for eliminating an enemy: the victim's earnings / 20, rounded up (at least 1, so a newcomer still counts).
+  S.teamPoints = (victimEarned) => Math.max(1, Math.ceil(victimEarned / 20));
+  S.TEAMS = [
+    { name: 'Barn Owls', owl: 'Barn Owl', css: '#ffb52e', body: 0xe8a030, belly: 0xfff6e0, face: 0xffffff, beak: 0xf2c9a0, eye: 0x1a0f08 },
+    { name: 'Great Horned Owls', owl: 'Great Horned Owl', css: '#b48cff', body: 0x3d2a8c, belly: 0x8f7fd8, face: 0xf4f0ff, beak: 0x15101f, eye: 0xff8a00 },
+  ];
+
   // Food weapons. Everyone starts with Mustard; the rest are bought once and kept forever.
   // Flags: pellets (shotgun), splash (radius), lob (extra upward speed), head (headshot damage),
   // pierce (ignores stain resistance), scope (hotdog zoom), pack/maxAmmo (consumable), blind (radius).
@@ -90,9 +107,9 @@
 
   S.inBox = (x, y, z) => y < 0 || S.BOXES.some(b => y < b.h && Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2);
 
-  // Distance from point to the player's body (vertical segment).
+  // Distance from point to the player's body (vertical segment). Bigger owls have taller bodies.
   S.distToPlayer = (x, y, z, p) => {
-    const cy = Math.max(p.y + 0.3, Math.min(p.y + 1.5, y));
+    const s = p.scale || 1, cy = Math.max(p.y + 0.3 * s, Math.min(p.y + 1.5 * s, y));
     return Math.hypot(x - p.x, y - cy, z - p.z);
   };
 

@@ -40,6 +40,16 @@ button:disabled { background: #888; cursor: default; }
 #board h3 { margin: 0 0 4px; }
 #board ol { margin: 0; padding-left: 22px; }
 #board li.me { color: #ffe600; font-weight: bold; }
+#clock { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); text-align: center; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+#clockText { font-size: 20px; background: rgba(0,0,0,0.45); padding: 2px 14px; border-radius: 10px; white-space: nowrap; }
+#teamScore { font-size: 26px; font-weight: bold; margin-top: 4px; white-space: nowrap; }
+#teamBoards { position: fixed; right: 12px; top: 12px; width: 260px; font-size: 14px; text-shadow: 1px 1px 0 #000; }
+.teamBoard { background: rgba(0,0,0,0.5); padding: 8px 14px; border-radius: 12px; margin-bottom: 8px; }
+.teamBoard h3 { margin: 0 0 4px; display: flex; justify-content: space-between; }
+.teamBoard ol { margin: 0; padding-left: 22px; }
+.teamBoard li.me { color: #ffe600; font-weight: bold; }
+#owlInfo { font-size: 16px; margin-top: 4px; font-weight: bold; }
+#results { z-index: 9; pointer-events: none; background: rgba(40, 0, 60, 0.3); }
 #killfeed { position: fixed; left: 12px; top: 12px; font-size: 15px; text-shadow: 1px 1px 0 #000; }
 #killfeed div { background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 8px; margin-bottom: 4px; }
 

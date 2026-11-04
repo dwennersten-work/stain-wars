@@ -44,13 +44,53 @@ const G = {
   leg: new THREE.BoxGeometry(0.25, 0.8, 0.3), body: new THREE.CylinderGeometry(0.42, 0.5, 0.8, 6),
   arm: new THREE.BoxGeometry(0.18, 0.6, 0.18), head: new THREE.IcosahedronGeometry(0.38, 0),
   eye: new THREE.SphereGeometry(0.13, 8, 6), pupil: new THREE.SphereGeometry(0.06, 6, 4), hat: new THREE.ConeGeometry(0.3, 0.55, 5),
+  blob: new THREE.IcosahedronGeometry(1, 1), cone: new THREE.ConeGeometry(1, 1, 5), cube: new THREE.BoxGeometry(1, 1, 1),
 };
 const skin = mat(0xffcc99), white = mat(0xffffff), black = mat(0x000000);
 
+// Team owls. Same height as a person at size 1 (faces -z). Different silhouettes as well as colors, so teams are
+// easy to tell apart at a distance: a round golden barn owl with a white heart face vs. a dark purple great horned
+// owl with ear tufts and big orange eyes. Materials are shared per team, so they cost almost nothing per player.
+const owlMats = S.TEAMS.map(T => ({ body: mat(T.body), belly: mat(T.belly), face: mat(T.face, { emissive: 0x777777 }), beak: mat(T.beak), eye: mat(T.eye), feet: mat(0xff9a1f) }));
+function makeOwl(team) {
+  const g = new THREE.Group(), m = owlMats[team - 1], barn = team === 1;
+  const add = (geo, mt, x, y, z, sx = 1, sy = sx, sz = sx, parent = g) => {
+    const o = new THREE.Mesh(geo, mt); o.position.set(x, y, z); o.scale.set(sx, sy, sz); parent.add(o); return o;
+  };
+  add(G.blob, m.body, 0, 0.95, 0, 0.62, 0.85, 0.55);
+  add(G.blob, m.belly, 0, 0.9, -0.28, 0.46, 0.62, 0.34);
+  add(G.blob, m.body, 0, 1.75, 0, barn ? 0.52 : 0.46, barn ? 0.46 : 0.42, 0.44);
+  for (const x of [-0.22, 0.22]) add(G.blob, m.feet, x, 0.08, -0.15, 0.16, 0.08, 0.24);
+  add(G.cone, m.body, 0, 0.35, 0.5, 0.26, 0.7, 0.12).rotation.x = 0.5;   // tail
+  const wings = [-1, 1].map(side => {
+    const pivot = new THREE.Group(); pivot.position.set(side * 0.55, 1.4, 0); g.add(pivot);
+    add(G.blob, m.body, side * 0.08, -0.45, 0, 0.15, 0.55, 0.38, pivot);
+    return pivot;
+  });
+  let eyes;
+  if (barn) {
+    for (const x of [-0.2, 0.2]) add(G.blob, m.face, x, 1.84, -0.34, 0.27, 0.27, 0.1);   // heart-shaped face: two lobes...
+    add(G.cone, m.face, 0, 1.56, -0.4, 0.42, 0.42, 0.07).rotation.x = Math.PI;              // ...and a point at the chin
+    add(G.cone, m.beak, 0, 1.68, -0.5, 0.05, 0.14, 0.05).rotation.x = Math.PI;
+    eyes = [add(G.eye, m.eye, -0.18, 1.84, -0.42, 0.65), add(G.eye, m.eye, 0.19, 1.86, -0.42, 0.8)];   // small, dark, derpy
+  } else {
+    for (const x of [-1, 1]) add(G.cone, m.body, x * 0.3, 2.2, 0, 0.14, 0.6, 0.14).rotation.z = -x * 0.3;   // ear tufts
+    add(G.blob, m.face, 0, 1.42, -0.38, 0.3, 0.13, 0.1);   // white throat
+    for (const y of [0.65, 0.85, 1.05]) add(G.cube, m.body, 0, y, -0.58, 0.5, 0.05, 0.12);   // barred chest
+    add(G.cone, m.beak, 0, 1.64, -0.45, 0.07, 0.16, 0.07).rotation.x = Math.PI;
+    for (const x of [-1, 1]) add(G.cube, m.beak, x * 0.19, 2.01, -0.38, 0.3, 0.05, 0.05).rotation.z = x * 0.3;   // angry brows
+    eyes = [add(G.eye, m.eye, -0.19, 1.8, -0.36, 1.3), add(G.eye, m.eye, 0.2, 1.83, -0.36, 1.6)];
+  }
+  // A white glint on the barn owl's dark eyes, a black pupil on the horned owl's orange ones. Both wobble.
+  const pupils = eyes.map(e => add(G.pupil, barn ? white : black, e.position.x, e.position.y, e.position.z - e.scale.z * 0.12));
+  return { g, wings, eyes, pupils };
+}
+
 function makeAvatar() {
-  const g = new THREE.Group();
+  const g = new THREE.Group(), human = new THREE.Group();
+  g.add(human);
   const shirt = mat(0xffffff), pants = mat(0xffffff), hat = mat(0xffffff);
-  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); human.add(o); return o; };
   add(G.leg, pants, -0.15, 0.4, 0); add(G.leg, pants, 0.15, 0.4, 0);
   add(G.body, shirt, 0, 1.2, 0);
   const armL = add(G.arm, shirt, -0.55, 1.25, 0), armR = add(G.arm, shirt, 0.55, 1.25, 0);
@@ -63,8 +103,16 @@ function makeAvatar() {
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(canvas), depthTest: false }));
   tag.scale.set(2.4, 0.6, 1); tag.position.y = 2.95; g.add(tag);
   scene.add(g);
-  return { g, shirt, pants, hat, armL, armR, pupils, eyes: [eyeL, eyeR], canvas, tag, tier: -1, hp: -1, name: '',
-    target: new THREE.Vector3(), ry: 0, phase: Math.random() * 10 };
+  return { g, human, shirt, pants, hat, armL, armR, pupils, eyes: [eyeL, eyeR], canvas, tag, tier: -1, hp: -1, name: '',
+    team: 0, owl: null, owls: {}, size: 1, sizeTarget: 1, target: new THREE.Vector3(), ry: 0, phase: Math.random() * 10 };
+}
+
+function setForm(a, team) {
+  a.team = team;
+  a.human.visible = !team;
+  if (team && !a.owls[team]) { a.owls[team] = makeOwl(team); a.g.add(a.owls[team].g); }
+  for (const t in a.owls) a.owls[t].g.visible = +t === team;
+  a.owl = team ? a.owls[team] : null;
 }
 
 function setOutfit(mats, tier) {
@@ -78,7 +126,7 @@ function drawTag(a) {
   const c = a.canvas.getContext('2d');
   c.clearRect(0, 0, 256, 64);
   c.font = 'bold 26px Comic Sans MS, sans-serif'; c.textAlign = 'center';
-  c.lineWidth = 5; c.strokeStyle = '#000'; c.fillStyle = '#' + S.OUTFITS[a.tier].shirt.toString(16).padStart(6, '0');
+  c.lineWidth = 5; c.strokeStyle = '#000'; c.fillStyle = a.team ? S.TEAMS[a.team - 1].css : '#' + S.OUTFITS[a.tier].shirt.toString(16).padStart(6, '0');
   c.strokeText(a.name, 128, 28); c.fillText(a.name, 128, 28);
   c.fillStyle = '#000'; c.fillRect(48, 40, 160, 14);
   c.fillStyle = a.hp > 50 ? '#3f3' : a.hp > 25 ? '#fd0' : '#f33'; c.fillRect(50, 42, 156 * Math.max(0, a.hp) / 100, 10);
@@ -86,7 +134,7 @@ function drawTag(a) {
 }
 
 const avatars = new Map();
-const names = new Map();
+const info = new Map();   // id -> { name, team, scale }, from the 1Hz board
 
 // ---------- Weapons: projectiles, viewmodels ----------
 function burgerMesh(s) {
@@ -229,12 +277,14 @@ const SFX = {
   chaching: () => { tone(2100, 0.06, { type: 'triangle', vol: 0.08, to: 2100 }); tone(2800, 0.4, { type: 'triangle', vol: 0.08, to: 2800, at: 0.06 }); noise(0.15, { vol: 0.05, type: 'highpass', f: 6000, at: 0.06 }); },
   nope: () => tone(150, 0.2, { vol: 0.04, to: 140 }),
   jump: () => tone(250, 0.14, { type: 'sine', vol: 0.03, to: 650 }),
+  hoot: () => notes([[330, 0.25], [294, 0.5], [330, 0.2], [294, 0.6]], { type: 'sine', vol: 0.14, vib: 6 }),
 };
 const fireSfx = [SFX.squirt, SFX.fizz, SFX.whip, SFX.lob, SFX.lob, SFX.snipe, SFX.spray];
 
 // ---------- Local player ----------
 const me = { x: 0, y: 0, z: 0, vy: 0, onGround: true };
-let myId = 0, myName = '', yaw = 0, pitch = 0, alive = true, hp = 100, tier = 0, money = 0, kills = 0, ammo = 0, blindLeft = 0;
+let myId = 0, myName = '', yaw = 0, pitch = 0, alive = true, hp = 100, tier = 0, money = 0, earned = 0, ammo = 0, blindLeft = 0;
+let phase = 'free', phaseLeft = 0, teamNext = true, scores = [0, 0], myTeam = 0, myScale = 1, eyeScale = 1;
 let owned = S.WEAPONS.map((_, i) => i === 0 ? 1 : 0);
 let weapon = 0, firing = false, zoom = false, lastFire = 0, lastBomb = 0, kick = 0, lastSend = 0, inShop = false;
 const SLOTS = S.FLASH;   // weapon slots 1..6; the cream bomb is thrown with G
@@ -283,7 +333,7 @@ function renderWeapons() {
 }
 function throwBomb() {
   const now = performance.now();
-  if (!alive || inShop || now - lastBomb < S.WEAPONS[S.FLASH].cd * 1000) return;
+  if (!alive || inShop || phase === 'ended' || now - lastBomb < S.WEAPONS[S.FLASH].cd * 1000) return;
   if (!ammo) { popup('🍦 Out of cream bombs! Buy more [B]'); SFX.nope(); return; }
   lastBomb = now;
   camera.getWorldDirection(fwd);
@@ -326,9 +376,45 @@ function updateHud() {
   $('hpBar').style.width = Math.max(0, hp) + '%';
   $('hpText').textContent = `Cleanliness ${Math.max(0, Math.ceil(hp))}%`;
   $('money').textContent = '$' + money;
-  $('kills').textContent = kills + ' stains';
+  $('kills').textContent = earned + ' stains';
   const o = S.OUTFITS[tier];
   $('outfit').innerHTML = `${swatches(o)} ${o.name} (${Math.round(o.res * 100)}% resist)`;
+  $('owlInfo').classList.toggle('hidden', !myTeam);
+  if (myTeam) {
+    const T = S.TEAMS[myTeam - 1];
+    $('owlInfo').textContent = `🦉 You are a ${T.owl} (size ${myScale.toFixed(1)}×)`;
+    $('owlInfo').style.color = T.css;
+  }
+}
+const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+function updateClock() {
+  phaseLeft = Math.max(0, phaseLeft - 250);
+  const label = { free: 'Free play', ffa: (teamNext ? '🦉 Owl Showdown in ' : '⏱️ Game ends in ') + mmss(phaseLeft), team: '🦉 Owl Showdown: ' + mmss(phaseLeft), ended: '🏁 Game over' };
+  $('clockText').textContent = label[phase];
+}
+setInterval(updateClock, 250);
+
+function renderTeams(list) {
+  S.TEAMS.forEach((T, i) => {
+    const rows = list.filter(r => r[6] === i + 1).sort((a, b) => b[8] - a[8] || b[3] - a[3]);
+    const shown = rows.slice(0, 8), mine = rows.find(r => r[0] === myId);
+    if (mine && !shown.includes(mine)) shown[shown.length - 1] = mine;   // always show yourself
+    $(`team${i + 1}Head`).innerHTML = `<span>🦉 ${T.name}</span><span>${scores[i]}</span>`;
+    $(`team${i + 1}Head`).style.color = T.css;
+    $(`team${i + 1}List`).innerHTML = shown.map(r => `<li class="${r[0] === myId ? 'me' : ''}">${r[1]} — ${r[8]} pts</li>`).join('');
+  });
+  const a = S.TEAMS[0], b = S.TEAMS[1];
+  $('teamScore').innerHTML = `<span style="color:${a.css}">${scores[0]}</span> : <span style="color:${b.css}">${scores[1]}</span>`;
+}
+
+function renderResults(r) {
+  const line = (label, entry) => entry ? `<p>${label}: <b>${entry[0]}</b> (${entry[1]})</p>` : '';
+  if (r.winner === null) $('resultsHead').textContent = '🏁 Time!';
+  else $('resultsHead').textContent = r.winner < 0 ? '🤝 It\'s a tie!' : `🏆 ${S.TEAMS[r.winner].name} win!`;
+  $('resultsBody').innerHTML = (r.winner === null ? '' :
+    S.TEAMS.map((T, i) => `<p style="font-size:24px"><b style="color:${T.css}">${T.name}: ${r.scores[i]}</b></p>`).join('') +
+    S.TEAMS.map((T, i) => line(`${T.owl} MVP (points)`, r.mvp[i])).join('')) +
+    r.top.map((e, i) => line(['🥇 Most stains', '🥈 2nd', '🥉 3rd'][i], e)).join('');
 }
 let popTimer;
 function popup(text) {
@@ -344,7 +430,7 @@ function flash(color) {
 socket.on('welcome', (m) => { myId = m.id; myName = m.name; Object.assign(me, m.spawn); $('myName').textContent = m.name; });
 socket.on('me', (m) => {
   const got = m.owned.findIndex((o, i) => o && !owned[i]);   // just bought a weapon? equip it
-  money = m.money; tier = m.tier; kills = m.kills; ammo = m.ammo; owned = m.owned;
+  money = m.money; earned = m.earned; tier = m.tier; ammo = m.ammo; owned = m.owned;
   if (got >= 0 && got < SLOTS) setWeapon(got); else if (!owned[weapon]) setWeapon(0); else renderWeapons();
   updateHud(); if (inShop) renderShop();
 });
@@ -360,15 +446,34 @@ socket.on('snap', (list) => {
     let a = avatars.get(id);
     if (!a) { a = makeAvatar(); a.g.position.set(x, y, z); avatars.set(id, a); }
     a.target.set(x, y, z); a.ry = ry; a.g.visible = !dead;
-    const nm = names.get(id) || '';
+    const inf = info.get(id), nm = inf ? inf.name : '', team = inf ? inf.team : 0;
+    a.sizeTarget = inf ? inf.scale : 1;
+    if (a.team !== team) { setForm(a, team); a.hp = -1; }
     if (a.tier !== t) { a.tier = t; setOutfit(a, t); a.hp = -1; }
     if (a.hp !== h || a.name !== nm) { a.hp = h; a.name = nm; drawTag(a); }
   }
   for (const [id, a] of avatars) if (!seen.has(id)) { scene.remove(a.g); avatars.delete(id); }
   updateHud();
 });
-socket.on('board', (list) => {
-  for (const [id, n] of list) names.set(id, n);
+socket.on('board', (m) => {
+  const { list } = m, wasPhase = phase, wasLeft = phaseLeft;
+  phase = m.phase; phaseLeft = m.left; teamNext = m.teamNext; scores = m.scores;
+  info.clear();
+  for (const r of list) info.set(r[0], { name: r[1], team: r[6], scale: r[7] });
+  const mine = info.get(myId), wasTeam = myTeam;
+  myTeam = mine ? mine.team : 0; myScale = mine ? mine.scale : 1;
+  if (myTeam && myTeam !== wasTeam) { popup(`🦉 You're a ${S.TEAMS[myTeam - 1].owl}!`); SFX.hoot(); }
+  else if (phase === 'ffa' && wasPhase !== 'ffa') { popup('🍔 New game! Go!'); SFX.whistle(); }
+  else if (phase === 'ffa' && teamNext && wasLeft > 60000 && phaseLeft <= 60000) { popup('🦉 Owl Showdown in 1 minute!'); SFX.hoot(); }
+  if (phase === 'ended' && wasPhase !== 'ended') { firing = false; SFX.kazoo(); }
+  const showTeams = list.some(r => r[6]);
+  $('teamBoards').classList.toggle('hidden', !showTeams);
+  $('teamScore').classList.toggle('hidden', !showTeams);
+  $('board').classList.toggle('hidden', showTeams);
+  $('results').classList.toggle('hidden', !(phase === 'ended' && m.results));
+  if (phase === 'ended' && m.results) renderResults(m.results);
+  if (showTeams) renderTeams(list);
+  updateClock(); updateHud();
   list.sort((a, b) => b[3] - a[3] || b[2] - a[2]);
   $('boardList').innerHTML = list.slice(0, 10).map(([id, n, t, k, m]) =>
     `<li class="${id === myId ? 'me' : ''}">${swatches(S.OUTFITS[t]).split('</span>')[0]}</span> ${n} — ${k} 🎯 $${m}</li>`).join('');
@@ -404,9 +509,9 @@ socket.on('hitmark', (m) => {
 });
 socket.on('kill', (k) => {
   const div = document.createElement('div');
-  div.textContent = `${k.k} ${S.WEAPONS[k.w].icon}${k.head ? '🎯' : ''} ${k.v}`;
+  div.textContent = `${k.k} ${S.WEAPONS[k.w].icon}${k.head ? '🎯' : ''} ${k.v}${k.pts ? ` +${k.pts} pts` : ''}`;
   $('killfeed').prepend(div); setTimeout(() => div.remove(), 5000);
-  if (k.k === myName && k.v !== myName) { popup(`🎉 You stained ${k.v}!`); SFX.kazoo(); }
+  if (k.k === myName && k.v !== myName) { popup(k.pts ? `🎉 You stained ${k.v}! +${k.pts} pts` : `🎉 You stained ${k.v}!`); SFX.kazoo(); }
   if (k.v === myName) {
     alive = false; firing = false; SFX.trombone();
     $('deadMsg').textContent = `${k.k} got you with the ${S.WEAPONS[k.w].name}${k.head ? ' (HEADSHOT!)' : ''}! Your outfit and food are safe. Respawning...`;
@@ -429,13 +534,14 @@ function loop() {
     if (wasGround && me.vy > 0) SFX.jump();
     if (l > 0 && me.onGround) kick += dt * 10;
   }
-  camera.position.set(me.x, me.y + 1.6, me.z);
+  eyeScale += (myScale - eyeScale) * Math.min(1, dt * 3);   // bigger owls see from higher up (server fires from the same height)
+  camera.position.set(me.x, me.y + 1.6 * eyeScale, me.z);
   camera.rotation.set(pitch, yaw, 0, 'YXZ');
   if (now - lastSend > 50) { lastSend = now; socket.emit('pos', [me.x, me.y, me.z, yaw].map(n => Math.round(n * 100) / 100)); }
 
   // shooting
   const W = S.WEAPONS[weapon];
-  if (firing && alive && now - lastFire > W.cd * 1000) {
+  if (firing && alive && phase !== 'ended' && now - lastFire > W.cd * 1000) {
     lastFire = now;
     camera.getWorldDirection(fwd);
     socket.emit('fire', { w: weapon, d: fwd.toArray() });
@@ -461,9 +567,13 @@ function loop() {
     const moving = a.g.position.distanceToSquared(a.target) > 0.001;
     a.g.position.lerp(a.target, 0.25);
     a.g.rotation.y = a.ry;
+    a.size += (a.sizeTarget - a.size) * Math.min(1, dt * 3);
+    a.g.scale.setScalar(a.size);
     const sw = moving ? Math.sin(t * 12 + a.phase) * 0.8 : 0;
+    const face = a.owl || a;
+    face.pupils.forEach((p, i) => { p.position.x = face.eyes[i].position.x + Math.sin(t * 7 + a.phase + i * 2) * 0.05; });
+    if (a.owl) { const flap = 0.15 + (moving ? 0.5 + Math.sin(t * 16 + a.phase) * 0.5 : 0); a.owl.wings[0].rotation.z = -flap; a.owl.wings[1].rotation.z = flap; continue; }
     a.armL.rotation.x = sw; a.armR.rotation.x = -sw;
-    a.pupils.forEach((p, i) => { p.position.x = a.eyes[i].position.x + Math.sin(t * 7 + a.phase + i * 2) * 0.05; });
     const o = S.OUTFITS[a.tier];
     if (o && o.rainbow) {
       const h = (t * o.rainbow * 0.3 + a.phase) % 1;

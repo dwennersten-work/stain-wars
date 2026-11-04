@@ -14,7 +14,14 @@ Important decisions and *why*. A fresh context should read this first (after `re
 - **Install:** public GitHub repo `dwennersten-work/stain-wars` + one-liner `curl … install.sh | bash`. Runs as a systemd service `stainwars` from `/opt/stainwars`.
 
 ## Gameplay
-- **Endless arena**, live leaderboard, drop in any time.
+- **Arena with timed game sessions.** Drop in any time. Until the teacher starts a game it's endless free play. `stainwars newgame [ffaMin] [teamMin]` wipes everyone's progress and runs: free-for-all (default 15 min) → Owl Showdown (default 5 min) → 30s results → free play. **No timer starts by itself**, so a game can't run out in an empty server before class. There is one game at a time in one arena (a single class on a small droplet doesn't need parallel rooms). All session state is in memory, since the server must not write files.
+- **Game length:** the request said both "last 5 of 15" and "20 minutes total". We read that as 15 + 5 = 20. Any other split is one command away.
+- **Owl Showdown (team finale).** Everyone becomes a Barn Owl or a Great Horned Owl, with different silhouettes (round + heart face vs. ear tufts + orange eyes) as well as colors (gold vs. purple), so a teammate can be spotted at a distance. Two team leaderboards replace the normal one. Money, shop, weapons and outfit resistance all work as before; the owl only replaces how you look. Everyone respawns when it starts.
+- **Fair teams:** strength = stains earned + 25 × outfit tier. Humans are ranked (with ±10% jitter so splits vary) and dealt out in neighboring pairs, with the stronger of each pair going to the team that's behind; then the same for bots, so bots can't pile students onto one side. Latecomers join the smaller team. In simulation the average strength gap is ~4% vs. ~30% for a coin flip (a tiny class with one dominant player can't be fully evened out). No rebalancing if people leave.
+- **"Stains" = total money earned this game** (`earned`), which spending doesn't reduce. The HUD now shows this instead of kills; kills stay on the leaderboard.
+- **Team points:** eliminating an enemy scores the **victim's** `earned / 20`, rounded up, with a **minimum of 1** so a newcomer who earned $0 still counts. Big owls are the most valuable targets, which gives the losing team a way back. AFK victims score nothing (same anti-farm rule as money), but repeat kills aren't reduced, because re-killing the same enemy is normal in a small class. A player who leaves takes their name off the board, but their points stay with the team.
+- **No friendly fire in the Showdown** (shots, splash and cream all pass through teammates). The request said "nothing else changes", but otherwise teammates could kill each other for money.
+- **Owl size is linear in `earned`, relative to the top earner:** 0.8× at $0 up to 2.5× for the leader, so it works for any game length (a floor of $100 stops a first kill making someone giant). **Hitbox, headshot height and eye height scale too.** Otherwise shots would pass visibly through a giant owl. So the best player is the biggest target and worth the most, but can see over boxes. Movement speed, jump and collision radius don't change, so `clientMove` is unaffected.
 - **Weapons (food), bought in the shop (B), kept forever:** everyone starts with only the 1 Mustard squirter. Prices go up with power: 2 Soda shotgun $40 (8 pellets, close range), 3 Spaghetti whip $60 (wide 4m melee), 4 Hamburger grenade $100 (lobbed, big splash), 5 Pie launcher $150 (heavy, small splash), 6 Ketchup sniper $250 with a **hotdog scope** (right-click / Shift).
 - **Sniper: headshot = 1 shot, body = 2 shots, always.** It ignores stain resistance, so the rule holds against every outfit. Balanced by the 1.4s cooldown, the highest price, and the need to aim. Headshot = hit above feet + 1.62m (server-side).
 - **Whipped cream bomb = flashbang.** A consumable, thrown with G: $30 for 3, carry max 6. Blinds players within 10m (not the thrower) for 0.8 to 4s, halved if they face away. The blind is drawn by the client, so a cheater could ignore it. Accepted for a classroom game. Bots stop aiming while blinded.
@@ -27,7 +34,7 @@ Important decisions and *why*. A fresh context should read this first (after `re
 
 ## Admin
 - **System usage = just `htop`** for now (saves time/tokens). A web admin dashboard is on the TODO list.
-- **Teacher controls are CLI only:** `stainwars reset | bots N | nobots | status` on the droplet. They hit localhost-only HTTP endpoints on the game server.
+- **Teacher controls are CLI only:** `stainwars newgame [ffaMin] [teamMin] | skip | stop | reset | bots N | nobots | status` on the droplet. They hit localhost-only HTTP endpoints on the game server.
 
 ## Security
 The goal is to make sure that hosting the game can't hurt the teacher's GitHub or DigitalOcean accounts, and that students can't break the game.

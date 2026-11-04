@@ -11,7 +11,7 @@
 
 ## Run locally
 `npm install && npm start`, then open http://localhost:3000 (PORT env overrides).
-Admin: `curl localhost:3000/admin/status`, `/admin/bots?n=10`, `/admin/nobots`, `/admin/reset`.
+Admin: `curl localhost:3000/admin/status`, `/admin/newgame?ffa=15&team=5` (minutes; decimals work for quick tests), `/admin/skip`, `/admin/stop`, `/admin/bots?n=10`, `/admin/nobots`, `/admin/reset`.
 
 ## Conventions
 - Keep it simple: MVP quality, minimal error checking, no build tooling, no extra dependencies.

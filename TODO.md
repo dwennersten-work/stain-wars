@@ -40,7 +40,17 @@
 - [x] Deep-freeze `Shared` (nested WEAPONS/OUTFITS/BOXES too)
 - [ ] Re-test speed hacks on the droplet with real students after `stainwars update`
 
+## Phase 5 — Game sessions & Owl Showdown
+- [x] Timed sessions: free-for-all → team finale → results → free play
+- [x] `stainwars newgame [ffaMin] [teamMin]`, `skip`, `stop`; custom time limits
+- [x] Random but strength-balanced teams; latecomers join the smaller team
+- [x] Barn Owl and Great Horned Owl models, team colors, size by stains earned (hitbox and eye height too)
+- [x] Team scoring: victim's earnings / 20, rounded up (min 1); no friendly fire
+- [x] Two team leaderboards, game clock, score display, final results screen
+- [ ] Playtest with a real class: owl size range, team points, whether giant owls see too far over boxes
+
 ## Later (ideas, not started)
+- [ ] Rebalance teams if many players leave during the Showdown
 - [ ] Web admin dashboard `/admin`: live CPU/RAM/network/player-count graphs for screensharing
 - [ ] Show "cost per player" (CPU %/bandwidth per connected player)
 - [ ] Password-protected admin page with reset / add-bots buttons
