@@ -8,7 +8,7 @@ A derpy, low-poly, browser multiplayer food fight for teaching cloud computing. 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/dwennersten-work/stain-wars/main/install.sh | bash
    ```
-3. Give students `http://<droplet-ip>`.
+3. Give students `http://<droplet-ip>`. Run `stainwars url` any time to see it again.
 
 To try out a branch before it goes to `main`, use that branch's script and name the branch:
 ```bash
@@ -24,6 +24,7 @@ Re-run it to get newer commits from that branch. To go back, run the normal inst
 | `stainwars newgame 10 3` | Custom times: 10 min free-for-all + 3 min Owl Showdown (`newgame 0 5` skips straight to owls) |
 | `stainwars skip` | Jump to the next phase now |
 | `stainwars stop` | End the game, back to free play (everyone keeps their stuff) |
+| `stainwars url` | Print the link to give students (`http://<droplet-ip>`) |
 | `stainwars status` | Game phase, time left, team score, humans, bots, projectiles in flight, server memory |
 | `stainwars bots 20` | Add 20 derpy bots (more load!) |
 | `stainwars nobots` | Remove bots |
