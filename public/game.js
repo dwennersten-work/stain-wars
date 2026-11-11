@@ -2,6 +2,9 @@ import * as THREE from 'three';
 const S = window.Shared;
 const socket = io();
 const $ = (id) => document.getElementById(id);
+// Phones and tablets get touch controls and a smaller HUD. Laptops (even ones with a touch screen) keep mouse + keyboard.
+const TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
+document.body.classList.toggle('touch', TOUCH);
 
 // ---------- Scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -366,17 +369,88 @@ addEventListener('mousemove', (e) => {
   yaw -= e.movementX * sens;
   pitch = Math.max(-1.5, Math.min(1.5, pitch - e.movementY * sens));
 });
-const lock = () => { renderer.domElement.requestPointerLock(); audio(); };
+const lock = () => {
+  audio();
+  if (!TOUCH) return renderer.domElement.requestPointerLock();
+  // No pointer lock on phones: just hide the menu. Fullscreen + landscape where the browser allows it (not iPhone Safari).
+  ac.resume();
+  $('start').classList.add('hidden');
+  const el = document.documentElement;
+  if (el.requestFullscreen && !document.fullscreenElement) {
+    el.requestFullscreen().then(() => screen.orientation.lock('landscape')).catch(() => {});
+  }
+};
 $('playBtn').onclick = lock;
+if (TOUCH) { $('playBtn').textContent = 'TAP TO PLAY'; $('shopClose').textContent = 'Back to the fight'; }
 document.addEventListener('pointerlockchange', () => {
   const locked = !!document.pointerLockElement;
   if (!locked) firing = zoom = false;
   $('start').classList.toggle('hidden', locked || inShop);
 });
 
+// ---------- Touch controls ----------
+// Left side of the screen: a joystick that appears under your thumb. Right side: drag to aim.
+// A finger that starts on the fire button also aims, so you can track someone while shooting.
+const stick = { id: null, x: 0, y: 0, dx: 0, dy: 0 }, STICK_R = 55;
+if (TOUCH) {
+  const looks = new Map();   // touch id -> last [x, y]
+  let fireId = null, jumpId = null;
+  const inMenu = (e) => !!e.target.closest('.overlay');   // menus and the shop keep normal taps and scrolling
+  const opts = { passive: false };
+  document.addEventListener('touchstart', (e) => {
+    if (inMenu(e)) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const btn = t.target.closest('.tb'), slot = t.target.closest('#weapons div'), id = t.identifier;
+      if (slot) {
+        const s = slot.dataset.s;
+        if (s === 'shop') toggleShop(); else if (s === 'bomb') throwBomb(); else setWeapon(+s);
+      } else if (btn && btn.dataset.tb === 'jump') { keys.Space = true; jumpId = id; btn.classList.add('down'); }
+      else if (btn && btn.dataset.tb === 'scope') { zoom = !zoom; btn.classList.toggle('down', zoom); }
+      else if (btn) { firing = true; fireId = id; btn.classList.add('down'); looks.set(id, [t.clientX, t.clientY]); }
+      else if (stick.id === null && t.clientX < innerWidth * 0.4) {
+        Object.assign(stick, { id, x: t.clientX, y: t.clientY, dx: 0, dy: 0 });
+        $('joy').style.left = t.clientX + 'px'; $('joy').style.top = t.clientY + 'px';
+        $('joyKnob').style.transform = ''; $('joy').classList.add('on');
+      } else looks.set(id, [t.clientX, t.clientY]);
+    }
+  }, opts);
+  document.addEventListener('touchmove', (e) => {
+    if (inMenu(e)) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      const last = looks.get(t.identifier);
+      if (t.identifier === stick.id) {
+        let dx = (t.clientX - stick.x) / STICK_R, dy = (t.clientY - stick.y) / STICK_R;
+        const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
+        stick.dx = dx; stick.dy = dy;
+        $('joyKnob').style.transform = `translate(${dx * STICK_R}px, ${dy * STICK_R}px)`;
+      } else if (last) {
+        const sens = 0.0055 * (camera.fov / 75);
+        yaw -= (t.clientX - last[0]) * sens;
+        pitch = Math.max(-1.5, Math.min(1.5, pitch - (t.clientY - last[1]) * sens));
+        last[0] = t.clientX; last[1] = t.clientY;
+      }
+    }
+  }, opts);
+  const end = (e) => {
+    for (const t of e.changedTouches) {
+      const id = t.identifier;
+      looks.delete(id);
+      if (id === stick.id) { stick.id = null; stick.dx = stick.dy = 0; $('joy').classList.remove('on'); }
+      if (id === fireId) { fireId = null; firing = false; $('tbFire').classList.remove('down'); }
+      if (id === jumpId) { jumpId = null; keys.Space = false; $('tbJump').classList.remove('down'); }
+    }
+  };
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', end);
+  document.addEventListener('gesturestart', (e) => e.preventDefault());   // iOS pinch zoom
+}
+
 function setWeapon(w) {
   if (w >= SLOTS) return;
   if (!owned[w]) { popup(`🔒 Buy the ${S.WEAPONS[w].name} in the shop [B]`); SFX.nope(); return; }
+  if (TOUCH) { zoom = false; $('tbScope').classList.remove('down'); $('tbScope').classList.toggle('hidden', !S.WEAPONS[w].scope); }
   if (w !== weapon) socket.emit('equip', w);   // the server needs to know: the tray only works with one-handed food
   weapon = w;
   views.forEach((v, i) => v.visible = i === w);
@@ -385,8 +459,8 @@ function setWeapon(w) {
 function renderWeapons() {
   const F = S.WEAPONS[S.FLASH];
   $('weapons').innerHTML = S.WEAPONS.slice(0, SLOTS).map((W, i) =>
-    `<div class="${i === weapon ? 'on' : ''} ${owned[i] ? '' : 'lock'}">${i + 1} ${W.icon}${dmgLv[i] ? '⭐' + dmgLv[i] : ''}</div>`).join('') +
-    `<div class="${ammo ? '' : 'lock'}">G ${F.icon}×${ammo}</div>`;
+    `<div data-s="${i}" class="${i === weapon ? 'on' : ''} ${owned[i] ? '' : 'lock'}">${TOUCH ? '' : i + 1 + ' '}${W.icon}${dmgLv[i] ? '⭐' + dmgLv[i] : ''}</div>`).join('') +
+    `<div data-s="bomb" class="${ammo ? '' : 'lock'}">${TOUCH ? '' : 'G '}${F.icon}×${ammo}</div>` + (TOUCH ? '<div data-s="shop">🛒</div>' : '');
   $('weaponName').textContent = S.WEAPONS[weapon].name + (dmgLv[weapon] ? ` (+${Math.round(dmgLv[weapon] * S.DMG_STEP * 100)}% damage)` : '');
 }
 function throwBomb() {
@@ -422,7 +496,7 @@ function renderShop() {
     const right = W.pack ? btn(`data-w="${i}"`, money >= W.cost && ammo < W.maxAmmo, ammo >= W.maxAmmo ? 'Full' : `+${W.pack} for $${W.cost}`)
       : owned[i] ? upgradeBtn(W, i) || '<b>OWNED</b>' : btn(`data-w="${i}"`, money >= W.cost, `Buy $${W.cost}`);
     return `<div class="item ${owned[i] ? 'cur' : ''}"><span class="ico">${W.icon}</span>
-      <span class="nm"><b>${W.name}</b><br><small>${W.desc}${W.pack ? ` · have ${ammo}/${W.maxAmmo} · throw with G` : ''}</small>${levelLine(W, i)}</span>${right}</div>`;
+      <span class="nm"><b>${W.name}</b><br><small>${W.desc}${W.pack ? ` · have ${ammo}/${W.maxAmmo} · ${TOUCH ? 'tap it in the bottom bar to throw' : 'throw with G'}` : ''}</small>${levelLine(W, i)}</span>${right}</div>`;
   }).join('');
   $('shopGear').innerHTML = `<div class="item ${hasTray ? 'cur' : ''}"><span class="ico">${S.TRAY.icon}</span>
     <span class="nm"><b>${S.TRAY.name}</b><br><small>${S.TRAY.desc}</small></span>
@@ -441,7 +515,7 @@ $('shopBody').onclick = (e) => {
 function toggleShop() {
   inShop = !inShop;
   $('shop').classList.toggle('hidden', !inShop);
-  if (inShop) { renderShop(); document.exitPointerLock(); } else lock();
+  if (inShop) { renderShop(); if (!TOUCH) document.exitPointerLock(); } else lock();
 }
 $('shopClose').onclick = toggleShop;
 
@@ -497,6 +571,7 @@ function renderResults(r) {
 }
 let popTimer;
 function popup(text) {
+  if (TOUCH) text = text.replace(' [B]', ' 🛒');
   $('popup').textContent = text; $('popup').style.opacity = 1;
   clearTimeout(popTimer); popTimer = setTimeout(() => $('popup').style.opacity = 0, 1500);
 }
@@ -585,6 +660,7 @@ socket.on('pop', (p) => {
 let lastOuch = 0, lastHit = 0;
 socket.on('ouch', (m) => {
   hp = m.hp; flash(hex(S.WEAPONS[m.w].color)); updateHud();
+  if (TOUCH && navigator.vibrate) navigator.vibrate(30);
   if (m.head) SFX.bonk(); else if (performance.now() - lastOuch > 80) { lastOuch = performance.now(); SFX.oof(); }
 });
 socket.on('trayhit', (m) => {
@@ -617,7 +693,7 @@ function loop() {
   const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime, now = performance.now();
 
   if (alive && !inShop) {
-    const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), r = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    const f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - stick.dy, r = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + stick.dx;
     let dx = -Math.sin(yaw) * f + Math.cos(yaw) * r, dz = -Math.cos(yaw) * f - Math.sin(yaw) * r;
     const l = Math.hypot(dx, dz); if (l > 1) { dx /= l; dz /= l; }
     const wasGround = me.onGround, hadAirJump = me.usedAir;

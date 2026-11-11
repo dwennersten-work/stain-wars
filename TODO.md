@@ -75,7 +75,8 @@
 - [ ] Web admin dashboard `/admin`: live CPU/RAM/network/player-count graphs for screensharing
 - [ ] Show "cost per player" (CPU %/bandwidth per connected player)
 - [ ] Password-protected admin page with reset / add-bots buttons
-- [ ] Mobile/touch controls
+- [x] Mobile/touch controls (joystick, drag to aim, tap weapon bar, small HUD)
+- [ ] Playtest touch controls on real phones (iPhone Safari and Android Chrome): aim sensitivity, button sizes, notch insets
 - [ ] More maps / map rotation
 - [ ] Playtest balance with a real class (prices, sniper strength, blind length)
 - [ ] Outfit preview in the shop (3D spin)

@@ -40,6 +40,8 @@ Until you run `stainwars newgame`, it's endless free play and no timer runs. A g
 ## Controls
 WASD + Space to move and jump (press Space again in the air to double jump) · mouse to aim · click to shoot · 1-6 or Q to switch weapons · right-click or Shift for the hotdog scope · G to throw a whipped cream bomb · B for the shop.
 
+**Phones and tablets** (held sideways): drag on the left to move · drag on the right to aim · hold 💥 to shoot (keep dragging to aim) · ⬆ to jump · tap the bottom bar for weapons, cream bombs and the shop · 🌭 toggles the scope.
+
 ## Good to know
 - **Falls:** a drop of more than 5× your height (10m) stains you instantly. Three-story roofs and the corner lookouts are that high, so take the stairs down.
 - **Cafeteria Tray ($120):** blocks hits from the front while you hold one-handed food (not the Soda Shotgun or Ketchup Sniper). It comes back 5 seconds after it breaks.

@@ -4,7 +4,8 @@ Important decisions and *why*. A fresh context should read this first (after `re
 
 ## Purpose & audience
 - **Why the game exists:** a teacher demo of cloud VM usage. Students play live while the teacher screenshares `htop` on the droplet so they see CPU/RAM rise with load.
-- **Players:** middle/high school students on **laptops** (touchpad or mouse + keyboard). No touch/mobile controls.
+- **Players:** middle/high school students on **laptops** (touchpad or mouse + keyboard). Phones and tablets also work, with touch controls.
+- **Touch controls are client-only** (`TOUCH` in `game.js`, `body.touch` in `style.css`). They're picked by `(hover: none) and (pointer: coarse)`, so a laptop with a touch screen keeps the exact laptop experience. Phones send the same `pos`/`fire` messages, so the server and its cheat checks didn't change. Left thumb is a joystick that appears where you touch, right thumb drags to aim, and a finger held on the fire button also aims. The scope is a toggle because both thumbs are busy. Portrait shows a "turn your phone" screen, since an FPS HUD doesn't fit. Fullscreen and landscape lock are requested where the browser allows them (not iPhone Safari).
 - **No accounts, no chat, no persistence.** Students click a link, get a random **parody** celebrity/model name (e.g., "Taylor Swiftly"). Real names were avoided because the players are minors in a school setting. Leaving resets you.
 
 ## Platform

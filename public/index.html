@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Stain Wars</title>
   <link rel="stylesheet" href="style.css">
   <script type="importmap">{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }</script>
@@ -30,23 +30,39 @@
     <div id="owlInfo" class="hidden"></div>
     <div id="weaponName"></div>
     <div id="weapons"></div>
-    <div class="hint">[B] Shop · [G] Whipped cream bomb · [Space] twice to double jump</div>
+    <div class="hint kb">[B] Shop · [G] Whipped cream bomb · [Space] twice to double jump</div>
   </div>
 
   <div id="popup"></div>
+
+  <!-- Touch controls: only shown on phones and tablets (body.touch) -->
+  <div id="joy"><div id="joyKnob"></div></div>
+  <div id="tbFire" class="tb" data-tb="fire">💥</div>
+  <div id="tbJump" class="tb" data-tb="jump">⬆</div>
+  <div id="tbScope" class="tb hidden" data-tb="scope">🌭</div>
+  <div id="rotate" class="overlay"><div class="panel"><h1>📱 ↻</h1><p>Turn your phone sideways to play!</p></div></div>
 
   <div id="start" class="overlay">
     <div class="panel">
       <h1>🍔 STAIN WARS 🌭</h1>
       <p>You are <b id="myName">...</b></p>
       <p class="small">Stain other players with condiments to win money.<br>Buy new food weapons and WILDER outfits in the shop. You keep everything you buy!<br>Wilder outfit = more stain resistance = worth more money to defeat.<br>⭐ Stains with a weapon level it up, so you can buy it more damage.<br>🏢 Climb the stairs and snipe from the roofs, but a drop of more than 5 times your height stains you instantly!<br>🦉 In the final minutes everyone becomes an owl on one of two teams. The more you've earned, the bigger your owl!</p>
-      <table class="small controls">
+      <table class="small controls kb">
         <tr><td>Move / Jump</td><td>WASD / Space (twice to double jump)</td></tr>
         <tr><td>Aim / Shoot</td><td>Mouse / Click</td></tr>
         <tr><td>Weapons</td><td>1-6 or Q</td></tr>
         <tr><td>Hotdog scope</td><td>Right-click or Shift (Ketchup Sniper)</td></tr>
         <tr><td>Whipped cream bomb</td><td>G (blinds people)</td></tr>
         <tr><td>Shop</td><td>B</td></tr>
+      </table>
+      <table class="small controls tc">
+        <tr><td>Move</td><td>Left thumb: drag anywhere on the left</td></tr>
+        <tr><td>Aim</td><td>Right thumb: drag anywhere on the right</td></tr>
+        <tr><td>Shoot</td><td>Hold 💥 (keep dragging to aim)</td></tr>
+        <tr><td>Jump</td><td>⬆ (twice to double jump)</td></tr>
+        <tr><td>Weapons</td><td>Tap one in the bar at the bottom</td></tr>
+        <tr><td>Hotdog scope</td><td>🌭 (Ketchup Sniper)</td></tr>
+        <tr><td>Cream bomb / Shop</td><td>🍦 / 🛒 in the bottom bar</td></tr>
       </table>
       <button id="playBtn">CLICK TO PLAY</button>
     </div>
