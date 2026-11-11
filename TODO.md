@@ -49,7 +49,7 @@
 - [x] Trees no longer spawn inside the corner lookouts
 - [x] Team scoring: victim's earnings / 20, rounded up (min 1); no friendly fire
 - [x] Two team leaderboards, game clock, score display, final results screen
-- [ ] Playtest with a real class: owl size range, team points, whether giant owls see too far over boxes
+- [ ] Playtest with a real class: owl size range, team points, whether giant owls see too far over boxes, whether the ~1.4× door cutoff is too strict (fix: taller doors)
 
 ## Phase 6 — Buildings & progression
 - [x] Map doubled to 160m × 160m; fog, camera range and sniper range to match

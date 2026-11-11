@@ -90,6 +90,7 @@ function jumpOff(B, dbl) {
   // Late double jump to soften the landing doesn't help.
   A = jumpOff(tower, true); check('double jump off 18m still stained', A.p.dead); remove(A);
   // Big owl survives a drop that kills a normal player (5x its own height).
+  // (It grows after climbing: a 2x owl can't get indoors in real play. Only the fall limit is under test.)
   A = atDoor(three); climb(A, three); A.p.scale = 2; A.p.team = 1;
   go(A, three.x, three.az1 - 0.8);
   let jumped = false;

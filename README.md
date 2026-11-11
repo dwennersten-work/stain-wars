@@ -35,7 +35,7 @@ Re-run it to get newer commits from that branch. To go back, run the normal inst
 **Lesson idea:** start with no one connected and look at `htop`. Let students join and watch CPU go up. Then run `stainwars bots 50` and watch it climb more.
 
 ## How a game works
-Until you run `stainwars newgame`, it's endless free play and no timer runs. A game starts everyone from zero as a free-for-all. For the Owl Showdown, everyone is split into two fair teams and becomes a Barn Owl or a Great Horned Owl, sized by the stains (money) they've earned this game. Eliminating an enemy scores your team their earnings ÷ 20, rounded up. The higher team score wins.
+Until you run `stainwars newgame`, it's endless free play and no timer runs. A game starts everyone from zero as a free-for-all. For the Owl Showdown, everyone is split into two fair teams and becomes a Barn Owl or a Great Horned Owl, sized by the stains (money) they've earned this game. Owls over about 1.4× are too big to fit through doors, so smaller players can snipe them from the buildings. Eliminating an enemy scores your team their earnings ÷ 20, rounded up. The higher team score wins.
 
 ## Controls
 WASD + Space to move and jump (press Space again in the air to double jump) · mouse to aim · click to shoot · 1-6 or Q to switch weapons · right-click or Shift for the hotdog scope · G to throw a whipped cream bomb · B for the shop.
