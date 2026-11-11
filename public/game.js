@@ -66,10 +66,12 @@ for (let i = 0; i < 4; i++) {
   if (i >= 2) w.rotation.y = Math.PI / 2;
   scene.add(w);
 }
+// Trees stay outside the square fence. (A ring around the center put corner trees inside the lookouts.)
 for (let i = 0; i < 40; i++) {
-  const a = Math.random() * Math.PI * 2, d = S.ARENA + 8 + Math.random() * 40;
+  const along = (Math.random() * 2 - 1) * (S.ARENA + 40), out = (S.ARENA + 8 + Math.random() * 32) * (Math.random() < 0.5 ? -1 : 1);
+  const [x, z] = Math.random() < 0.5 ? [along, out] : [out, along];
   const tree = new THREE.Mesh(new THREE.ConeGeometry(2 + Math.random() * 2, 6 + Math.random() * 6, 5), mat(new THREE.Color().setHSL(Math.random(), 0.8, 0.55)));
-  tree.position.set(Math.cos(a) * d, 4, Math.sin(a) * d); scene.add(tree);
+  tree.position.set(x, 4, z); scene.add(tree);
 }
 
 // ---------- Avatars ----------
@@ -544,7 +546,7 @@ socket.on('board', (m) => {
   info.clear();
   for (const r of list) info.set(r[0], { name: r[1], team: r[6], scale: r[7] });
   const mine = info.get(myId), wasTeam = myTeam;
-  myTeam = mine ? mine.team : 0; myScale = mine ? mine.scale : 1;
+  myTeam = mine ? mine.team : 0; myScale = me.scale = mine ? mine.scale : 1;   // me.scale: big owls collide bigger
   if (myTeam && myTeam !== wasTeam) { popup(`🦉 You're a ${S.TEAMS[myTeam - 1].owl}!`); SFX.hoot(); }
   else if (phase === 'ffa' && wasPhase !== 'ffa') { popup('🍔 New game! Go!'); SFX.whistle(); }
   else if (phase === 'ffa' && teamNext && wasLeft > 60000 && phaseLeft <= 60000) { popup('🦉 Owl Showdown in 1 minute!'); SFX.hoot(); }

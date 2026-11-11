@@ -8,7 +8,7 @@
   S.MAX_RISE = (S.JUMP * S.JUMP + S.JUMP2 * S.JUMP2) / (2 * S.GRAVITY);   // highest possible double jump
   S.MAX_FALL = 40;         // terminal velocity
   S.RADIUS = 0.5;          // player radius
-  S.HEADROOM = 1.9;        // collision height (owls too, so they still fit through doors)
+  S.HEADROOM = 1.9;        // collision height of a normal player (owls scale it: see bodyScale)
   S.STEP_UP = 0.4;         // ledges this high are walked up. Stairs rise 0.3, and a slow client (20fps) dips 0.055 below the floor each frame
   S.PLAYER_H = 2;          // a player's height, for the fall rule
   // Landing after dropping more than 5x your own height stains you instantly. Bigger owls are taller, so they survive more.
@@ -42,6 +42,9 @@
   S.OWL_MAX = 2.5;
   S.OWL_TOP_FLOOR = 100;   // nobody looks giant until someone has earned at least this much
   S.owlScale = (earned, topEarned) => S.OWL_MIN + (S.OWL_MAX - S.OWL_MIN) * earned / Math.max(topEarned, S.OWL_TOP_FLOOR);
+  // Big owls collide at their size (radius and height), so ones over ~1.4x can't fit through doors (2.7m) and get sniped
+  // from the buildings. Small owls keep normal collision, so they can't squeeze anywhere a player can't.
+  S.bodyScale = (p) => Math.max(1, p.scale || 1);
   // Team points for eliminating an enemy: the victim's earnings / 20, rounded up (at least 1, so a newcomer still counts).
   S.teamPoints = (victimEarned) => Math.max(1, Math.ceil(victimEarned / 20));
   S.TEAMS = [
@@ -182,23 +185,26 @@
   const cellOf = (v) => Math.max(0, Math.min(N - 1, Math.floor((v + S.ARENA) / CELL)));
   const near = (x, z) => grid[cellOf(x) * N + cellOf(z)];
   for (const b of S.BOXES) {
-    const m = S.RADIUS + 0.1;
+    const m = S.RADIUS * S.OWL_MAX + 0.1;   // big enough for the biggest owl
     for (let i = cellOf(b.x - b.w / 2 - m); i <= cellOf(b.x + b.w / 2 + m); i++)
       for (let j = cellOf(b.z - b.d / 2 - m); j <= cellOf(b.z + b.d / 2 + m); j++) grid[i * N + j].push(b);
   }
   const over = (b, x, z) => Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2;
 
+  // Clear of every box by enough room for the biggest owl.
   S.randomSpawn = () => {
+    const m = S.RADIUS * S.OWL_MAX + 0.5;
     for (;;) {
       const p = { x: (Math.random() * 2 - 1) * (S.ARENA - 3), y: 0, z: (Math.random() * 2 - 1) * (S.ARENA - 3) };
-      if (!S.BOXES.some(b => Math.abs(p.x - b.x) < b.w / 2 + 1 && Math.abs(p.z - b.z) < b.d / 2 + 1)) return p;
+      if (!S.BOXES.some(b => Math.abs(p.x - b.x) < b.w / 2 + m && Math.abs(p.z - b.z) < b.d / 2 + m)) return p;
     }
   };
 
-  // Push a player {x,y,z} out of boxes; returns the ground height under them and sets p.ceil (lowest thing their head can hit).
-  // Each box is one of: under the feet (ground), level with the head (ceiling), clear above, or in the way (push out).
+  // Push a player {x,y,z,scale} out of boxes; returns the ground height under them and sets p.ceil (lowest thing their head can hit).
+  // Each box is one of: under the feet (ground), just over the head (ceiling), clear above, or in the way (push out).
+  // A ceiling must be over the player's center: a door lintel at head height in front of a big owl is a wall, not a ceiling.
   S.resolve = (p) => {
-    const R = S.RADIUS;
+    const s = S.bodyScale(p), R = S.RADIUS * s, H = S.HEADROOM * s;
     let ground = 0, ceil = Infinity;
     for (let pass = 0; pass < 2; pass++) {   // twice, so a corner can't push you from one wall into the other
       ground = 0; ceil = Infinity;
@@ -208,9 +214,9 @@
         const dx = p.x - cx, dz = p.z - cz, d2 = dx * dx + dz * dz;
         if (d2 >= R * R) continue;
         if (p.y >= b.top - S.STEP_UP) { ground = Math.max(ground, b.top); continue; }
-        const head = p.y + S.HEADROOM;
+        const head = p.y + H;
         if (head <= b.y) continue;
-        if (head < b.y + 0.5) { ceil = Math.min(ceil, b.y); continue; }
+        if (head < b.y + 0.5 && over(b, p.x, p.z)) { ceil = Math.min(ceil, b.y); continue; }
         if (d2 > 1e-6) { const d = Math.sqrt(d2); p.x = cx + dx / d * R; p.z = cz + dz / d * R; }
         else {
           const px = hx + R - Math.abs(p.x - b.x), pz = hz + R - Math.abs(p.z - b.z);
@@ -236,11 +242,12 @@
     // Small vertical steps, so a fast fall can't pass through a floor.
     const dy = p.vy * dt, n = Math.max(1, Math.ceil(Math.abs(dy) / 0.3));
     let g = 0;
+    const H = S.HEADROOM * S.bodyScale(p);
     p.onGround = false;
     for (let i = 0; i < n; i++) {
       p.y += dy / n;
       g = S.resolve(p);
-      if (p.vy > 0 && p.y + S.HEADROOM > p.ceil) { p.y = p.ceil - S.HEADROOM; p.vy = 0; }   // bonk
+      if (p.vy > 0 && p.y + H > p.ceil) { p.y = p.ceil - H; p.vy = 0; }   // bonk
       if (p.vy <= 0 && p.y <= g) { p.y = g; p.vy = 0; p.onGround = true; break; }
     }
     // Stay glued to the stairs going down, instead of hopping from step to step.

@@ -88,6 +88,24 @@ for (const B of S.BUILDINGS) for (const side of [-1, 1]) {
   console.log(`fall onto lookout roof: y=${p.y.toFixed(2)} expected ${B.roof}`);
   if (Math.abs(p.y - B.roof) > 0.01) fails++;
 }
+// Owls over ~1.4x are too big for the doors (2.7m): they get sniped from the buildings. Smaller ones walk in.
+for (const scale of [0.8, 1.3, 1.6, 2.5]) {
+  let inside = 0;
+  for (const B of S.BUILDINGS) {
+    const p = { x: B.doorX, y: 0, z: B.doorZ + 3, vy: 0, onGround: true, scale };
+    go(p, B.doorX, B.az1 - 2, 4);
+    if (p.z < B.az1) inside++;
+  }
+  const want = scale <= 1.4, ok = want ? inside === S.BUILDINGS.length : inside === 0;
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${scale}x owl ${want ? 'can' : 'cannot'} get in the front door (${inside}/${S.BUILDINGS.length})`);
+  if (!ok) fails++;
+}
+// Spawns leave room for the biggest owl.
+{
+  let stuck = 0;
+  for (let i = 0; i < 300; i++) { const p = { ...S.randomSpawn(), scale: S.OWL_MAX }, x = p.x, z = p.z; S.resolve(p); if (p.x !== x || p.z !== z) stuck++; }
+  console.log(`${stuck ? 'FAIL' : 'ok  '} giant owl spawns clear of boxes (${stuck} pushed)`); if (stuck) fails++;
+}
 // Nothing thinner than the projectile step: every wall/floor thick enough, and all boxes in bounds.
 const thin = S.BOXES.filter(b => b.top - b.y < 0.3);
 const out = S.BOXES.filter(b => Math.abs(b.x) + b.w / 2 > S.ARENA || Math.abs(b.z) + b.d / 2 > S.ARENA);

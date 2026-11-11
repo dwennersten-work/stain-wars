@@ -116,14 +116,15 @@ function resetMove(p) {
 
 // Walk from p toward q in small 3D steps so a big move can't skip through a wall, a floor or a ceiling.
 function sweep(p, q) {
-  const n = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) / 0.3) || 1, c = { x: p.x, y: p.y, z: p.z };
+  const n = Math.ceil(Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) / 0.3) || 1, c = { x: p.x, y: p.y, z: p.z, scale: p.scale };
+  const H = S.HEADROOM * S.bodyScale(p);
   const sx = (q.x - p.x) / n, sy = (q.y - p.y) / n, sz = (q.z - p.z) / n;
   let g = 0;
   for (let i = 0; i < n; i++) {
     c.x += sx; c.y += sy; c.z += sz;
     g = S.resolve(c);
     if (c.y < g) c.y = g;   // can't sink through a floor
-    else if (sy > 0 && c.y > g + 0.05 && c.y + S.HEADROOM > c.ceil + 0.15) c.y = c.ceil - S.HEADROOM;   // or rise through a ceiling
+    else if (sy > 0 && c.y > g + 0.05 && c.y + H > c.ceil + 0.15) c.y = c.ceil - H;   // or rise through a ceiling
   }
   q.x = c.x; q.y = c.y; q.z = c.z;
   return g;

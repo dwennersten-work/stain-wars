@@ -45,6 +45,8 @@
 - [x] `stainwars newgame [ffaMin] [teamMin]`, `skip`, `stop`; custom time limits
 - [x] Random but strength-balanced teams; latecomers join the smaller team
 - [x] Barn Owl and Great Horned Owl models, team colors, size by stains earned (hitbox and eye height too)
+- [x] Big owls (over ~1.4×) collide at their size and can't fit through doors, so smaller players can snipe them
+- [x] Trees no longer spawn inside the corner lookouts
 - [x] Team scoring: victim's earnings / 20, rounded up (min 1); no friendly fire
 - [x] Two team leaderboards, game clock, score display, final results screen
 - [ ] Playtest with a real class: owl size range, team points, whether giant owls see too far over boxes
