@@ -76,7 +76,11 @@
 - [ ] Show "cost per player" (CPU %/bandwidth per connected player)
 - [ ] Password-protected admin page with reset / add-bots buttons
 - [x] Mobile/touch controls (joystick, drag to aim, tap weapon bar, small HUD)
-- [ ] Playtest touch controls on real phones (iPhone Safari and Android Chrome): aim sensitivity, button sizes, notch insets
+- [x] First phone playtest (student): aim sensitivity raised 0.0055 → 0.0075; emoji fire/jump/scope buttons replaced with line icons
+- [ ] Playtest touch controls on more phones (iPhone Safari and Android Chrome): new aim speed, button sizes, notch insets. Maybe an in-game sensitivity slider
+- [x] Shots start where the shooter really is when strafing (position sent right before each shot)
+- [x] Kill reward grows with tier² instead of +$15 per tier (cheap outfits no longer nearly double your bounty)
+- [ ] Playtest the new reward curve: does the early game feel too slow?
 - [ ] More maps / map rotation
 - [ ] Playtest balance with a real class (prices, sniper strength, blind length)
 - [ ] Outfit preview in the shop (3D spin)

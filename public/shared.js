@@ -30,7 +30,10 @@
     { name: 'Disco Ball Royalty',    cost: 390, res: 0.40, shirt: 0xffffff, pants: 0xffd700, hat: 0xff00ff, glow: 0.6, rainbow: 0.6 },
     { name: 'Rainbow Chaos Supreme', cost: 480, res: 0.45, shirt: 0xff0000, pants: 0x00ff00, hat: 0x0000ff, glow: 0.8, rainbow: 1.5 },
   ];
-  S.killReward = (victimTier) => 20 + 15 * victimTier;
+  // Grows with the square of the tier: $20, 22, 28, 38, 52, 70, 92, 118, 148, 182. Cheap outfits add little bounty
+  // (they add little toughness), and fancy outfits still make juicy targets. A flat +$15/tier nearly doubled a
+  // Khaki Dad Fit's bounty for just 5% resistance.
+  S.killReward = (victimTier) => 20 + 2 * victimTier * victimTier;
 
   // A game session: a free-for-all, then a team "Owl Showdown". Teacher can override both: stainwars newgame 15 5
   S.FFA_MIN = 15;

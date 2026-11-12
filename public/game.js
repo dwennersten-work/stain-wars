@@ -426,7 +426,7 @@ if (TOUCH) {
         stick.dx = dx; stick.dy = dy;
         $('joyKnob').style.transform = `translate(${dx * STICK_R}px, ${dy * STICK_R}px)`;
       } else if (last) {
-        const sens = 0.0055 * (camera.fov / 75);
+        const sens = 0.0075 * (camera.fov / 75);   // playtest: 0.0055 felt a bit slow
         yaw -= (t.clientX - last[0]) * sens;
         pitch = Math.max(-1.5, Math.min(1.5, pitch - (t.clientY - last[1]) * sens));
         last[0] = t.clientX; last[1] = t.clientY;
@@ -463,12 +463,20 @@ function renderWeapons() {
     `<div data-s="bomb" class="${ammo ? '' : 'lock'}">${TOUCH ? '' : 'G '}${F.icon}×${ammo}</div>` + (TOUCH ? '<div data-s="shop">🛒</div>' : '');
   $('weaponName').textContent = S.WEAPONS[weapon].name + (dmgLv[weapon] ? ` (+${Math.round(dmgLv[weapon] * S.DMG_STEP * 100)}% damage)` : '');
 }
+// Our position goes to the server 20 times a second, and right before every shot. Socket.io keeps messages in order,
+// so the server moves us (with its usual speed and wall checks) and then fires from exactly where we stood.
+// Without the extra send, a strafing player's shots started up to 50ms of movement (0.4m) to the side.
+function sendPos() {
+  lastSend = performance.now();
+  socket.emit('pos', [me.x, me.y, me.z, yaw].map(n => Math.round(n * 100) / 100));
+}
 function throwBomb() {
   const now = performance.now();
   if (!alive || inShop || phase === 'ended' || now - lastBomb < S.WEAPONS[S.FLASH].cd * 1000) return;
   if (!ammo) { popup('🍦 Out of cream bombs! Buy more [B]'); SFX.nope(); return; }
   lastBomb = now;
   camera.getWorldDirection(fwd);
+  sendPos();
   socket.emit('fire', { w: S.FLASH, d: fwd.toArray() });
   SFX.spray();
 }
@@ -707,13 +715,14 @@ function loop() {
   viewY = me.onGround && Math.abs(me.y - viewY) < 1 ? viewY + (me.y - viewY) * Math.min(1, dt * 14) : me.y;
   camera.position.set(me.x, viewY + S.eyeHeight(me.x, me.y, me.z, eyeScale), me.z);
   camera.rotation.set(pitch, yaw, 0, 'YXZ');
-  if (now - lastSend > 50) { lastSend = now; socket.emit('pos', [me.x, me.y, me.z, yaw].map(n => Math.round(n * 100) / 100)); }
+  if (now - lastSend > 50) sendPos();
 
   // shooting
   const W = S.WEAPONS[weapon];
   if (firing && alive && phase !== 'ended' && now - lastFire > W.cd * 1000) {
     lastFire = now;
     camera.getWorldDirection(fwd);
+    sendPos();   // the server fires from its copy of us, so bring it up to date first (same origin on both sides)
     socket.emit('fire', { w: weapon, d: fwd.toArray() });
     views[weapon].position.z = -0.75;
     if (weapon === 2) views[2].rotation.x = -1.2;   // whip lash
