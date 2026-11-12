@@ -19,7 +19,7 @@ fi
 echo "== Getting the game ($BRANCH) =="
 # Ignore file modes: this script makes admin.sh executable, and git would otherwise call that a local change and refuse to update it.
 if [ -d "$DIR/.git" ]; then
-  git -C "$DIR" config core.fileMode false
+  git -C "$DIR" config --replace-all core.fileMode false   # the clone below can leave two fileMode lines; plain "config" refuses those
   git -C "$DIR" fetch origin
   git -C "$DIR" checkout "$BRANCH"
   git -C "$DIR" pull --ff-only
