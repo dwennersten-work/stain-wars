@@ -31,6 +31,8 @@ Re-run it to get newer commits from that branch. To go back, run the normal inst
 | `stainwars reset` | Stop any game; everyone back to Plain Beige Tee and $0 |
 | `stainwars logs` | Follow the server log |
 | `stainwars update` | Pull the latest version and restart |
+| `stainwars student add '<key>'` | Let a student run games over SSH: a `student` login that only gets a menu of game commands, `htop` and logs (no shell, no sudo). See [student_access.md](student_access.md) |
+| `stainwars student remove` | Take that access away (or just delete the droplet) |
 
 **Lesson idea:** start with no one connected and look at `htop`. Let students join and watch CPU go up. Then run `stainwars bots 50` and watch it climb more.
 

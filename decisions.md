@@ -64,6 +64,7 @@ The goal is to make sure that hosting the game can't hurt the teacher's GitHub o
 - **Not preventable without a big rewrite:** aimbots/triggerbots (good aim looks the same as a script) and wallhacks (every client gets every position). Both are noted in TODO.
 - **Abuse limits:** 80 humans total and 40 per IP. The per-IP limit is generous because a whole school shares one IP through NAT. Each socket may send 60 messages per second before it's disconnected, and socket.io messages are capped at 10KB.
 - **Admin endpoints are localhost-only** (checked against the socket's remote address, which can't be spoofed without a proxy). Don't put a reverse proxy in front without adding a password, or the admin endpoints become public.
+- **Student operator = SSH key with a forced command** (`stainwars student add '<key>'`). One `student` user, key login only, no password and no sudo. Its `authorized_keys` line uses `restrict,pty,command="stainwars student-shell"`, so the key can only open a menu of allow-listed game commands plus `htop` and `logs` (no shell, file copy or port forwarding). Arguments must be numbers. Pagers and `read -e` are avoided because they can open a shell. The user is in `systemd-journal` for `logs`. Rejected: sharing root or the teacher's key, a DigitalOcean team seat (billing and other droplets), or exposing `/admin/*` to the web. The access ends when the droplet is deleted.
 
 ## Process
 - Build an MVP fast ("the gist"), keep error checking minimal, and track extras in `TODO.md`.
