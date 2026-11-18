@@ -72,6 +72,8 @@
 - [ ] Test on a droplet: student add, menu commands, `htop`/`logs` + Ctrl+C, `ssh student@IP status`, shell escapes blocked, `student remove`
 - [ ] Walk the student through student_access.md on both a Windows and a Mac before game day
 - [ ] Check the school network allows outgoing SSH (port 22)
+- [ ] Merge mobile-support to main: droplets only get `stainwars student` after that (or install with `BRANCH=mobile-support`)
+- [ ] Class size vs `MAX_PER_IP = 40` in server.js: a whole class behind one school IP (NAT) counts as one IP. Raise it if more than 40 players
 
 ## Later (ideas, not started)
 - [ ] Minimap or compass, now that the map is bigger

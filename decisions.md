@@ -47,7 +47,7 @@ Important decisions and *why*. A fresh context should read this first (after `re
 
 ## Admin
 - **System usage = just `htop`** for now (saves time/tokens). A web admin dashboard is on the TODO list.
-- **Teacher controls are CLI only:** `stainwars newgame [ffaMin] [teamMin] | skip | stop | reset | bots N | nobots | status` on the droplet. They hit localhost-only HTTP endpoints on the game server.
+- **Teacher controls are CLI only:** `stainwars newgame [ffaMin] [teamMin] | skip | stop | reset | bots N | nobots | status` on the droplet. They hit localhost-only HTTP endpoints on the game server. A student helper gets the same game commands through a menu-only SSH login (`stainwars student add`, see Security and `student_access.md`).
 
 ## Security
 The goal is to make sure that hosting the game can't hurt the teacher's GitHub or DigitalOcean accounts, and that students can't break the game.
@@ -66,7 +66,7 @@ The goal is to make sure that hosting the game can't hurt the teacher's GitHub o
 - **Admin endpoints are localhost-only** (checked against the socket's remote address, which can't be spoofed without a proxy). Don't put a reverse proxy in front without adding a password, or the admin endpoints become public.
 - **The server must not crash on bad input.** A request for `//` made `new URL` throw and killed the process; systemd restarted it, but the running game was lost. Bad URLs now get a 400. As a backstop, `uncaughtException` is logged instead of exiting, because losing a game mid-class is worse than a possibly odd state (`stainwars restart` is the fix if it happens). Rejected: relying on systemd's restart alone.
 - **Bots are capped at 150 in total** (not just 100 per command), so repeated `bots 100` from the teacher or student can't overload a 1 vCPU droplet.
-- **Student operator = SSH key with a forced command** (`stainwars student add '<key>'`). One `student` user, key login only, no password and no sudo. Its `authorized_keys` line uses `restrict,pty,command="stainwars student-shell"`, so the key can only open a menu of allow-listed game commands plus `htop` and `logs` (no shell, file copy or port forwarding). Arguments must be numbers. Pagers and `read -e` are avoided because they can open a shell. The user is in `systemd-journal` for `logs`. Rejected: sharing root or the teacher's key, a DigitalOcean team seat (billing and other droplets), or exposing `/admin/*` to the web. The access ends when the droplet is deleted.
+- **Student operator = SSH key with a forced command** (`stainwars student add '<key>'`). One `student` user, key login only, no password and no sudo. Its `authorized_keys` line uses `restrict,pty,command="stainwars student-shell"`, so the key can only open a menu of allow-listed game commands plus `htop` and `logs` (no shell, file copy or port forwarding). Arguments must be numbers. Pagers and `read -e` are avoided because they can open a shell. The user is in `systemd-journal` for `logs`. Rejected: sharing root or the teacher's key, a DigitalOcean team seat (billing and other droplets), or exposing `/admin/*` to the web. The access ends when the droplet is deleted. Pitfalls: `restrict` also turns off the terminal, so `pty` is needed for htop. Use `trap ':' INT`: with no trap, Ctrl+C kills the menu; with `trap '' INT`, the children inherit "ignore" and Ctrl+C can't stop htop/logs.
 
 ## Process
 - Build an MVP fast ("the gist"), keep error checking minimal, and track extras in `TODO.md`.
