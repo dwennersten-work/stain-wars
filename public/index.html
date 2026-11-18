@@ -16,7 +16,8 @@
 
   <div id="killfeed"></div>
   <div id="clock"><div id="clockText"></div><div id="teamScore" class="hidden"></div></div>
-  <div id="board"><h3>🏆 Leaderboard</h3><ol id="boardList"></ol></div>
+  <div id="bossBar" class="hidden"><div id="bossName">🦃 Tom Gobbleton <small>(head = double damage!)</small></div><div id="bossHpWrap"><div id="bossHp"></div><span id="bossHpText"></span></div></div>
+  <div id="board"><h3 id="boardTitle">🏆 Leaderboard</h3><ol id="boardList"></ol></div>
   <div id="teamBoards" class="hidden">
     <div class="teamBoard"><h3 id="team1Head"></h3><ol id="team1List"></ol></div>
     <div class="teamBoard"><h3 id="team2Head"></h3><ol id="team2List"></ol></div>
@@ -30,8 +31,18 @@
     <div id="owlInfo" class="hidden"></div>
     <div id="weaponName"></div>
     <div id="weapons"></div>
-    <div class="hint kb">[B] Shop · [G] Whipped cream bomb · [Space] twice to double jump</div>
+    <div class="hint kb">[B] Shop · [G] Cream bomb · [E] Drive / zipline · [T] Emotes · [Space] twice to double jump</div>
   </div>
+
+  <div id="prompt" class="hidden"></div>
+  <div id="vehHud" class="hidden">
+    <div id="vehName"></div>
+    <div class="vbar"><span>❤️</span><div class="vtrack"><div id="vehHp"></div></div></div>
+    <div class="vbar"><span>⛽</span><div class="vtrack"><div id="vehFuel"></div></div></div>
+    <div id="vehMsg"></div>
+  </div>
+  <div id="emoteWheel" class="hidden"></div>
+  <canvas id="minimap" width="180" height="180"></canvas>
 
   <div id="popup"></div>
 
@@ -40,6 +51,7 @@
   <!-- Plain line icons (not emoji) so the buttons look like game controls. Crosshair = fire, chevron = jump, lens = scope. -->
   <div id="tbFire" class="tb" data-tb="fire"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><circle cx="12" cy="12" r="1" class="dot"/></svg></div>
   <div id="tbJump" class="tb" data-tb="jump"><svg viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></svg></div>
+  <div id="tbAct" class="tb hidden" data-tb="act"><span id="tbActIcon">🚗</span></div>
   <div id="tbScope" class="tb hidden" data-tb="scope"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l6 6M10.5 7.5v6M7.5 10.5h6"/></svg></div>
   <div id="rotate" class="overlay"><div class="panel"><h1>📱 ↻</h1><p>Turn your phone sideways to play!</p></div></div>
 
@@ -47,7 +59,7 @@
     <div class="panel">
       <h1>🍔 STAIN WARS 🌭</h1>
       <p>You are <b id="myName">...</b></p>
-      <p class="small">Stain other players with condiments to win money.<br>Buy new food weapons and WILDER outfits in the shop. You keep everything you buy!<br>Wilder outfit = more stain resistance = worth more money to defeat.<br>⭐ Stains with a weapon level it up, so you can buy it more damage.<br>🏢 Climb the stairs and snipe from the roofs, but a drop of more than 5 times your height stains you instantly!<br>🦉 In the final minutes everyone becomes an owl on one of two teams. The more you've earned, the bigger your owl!</p>
+      <p class="small">Stain other players with condiments to win money.<br>Buy new food weapons and WILDER outfits in the shop. You keep everything you buy!<br>Wilder outfit = more stain resistance = worth more money to defeat.<br>⭐ Stains with a weapon level it up, so you can buy it more damage.<br>🏢 Climb the stairs and snipe from the roofs, but a drop of more than 5 times your height stains you instantly!<br>🦉 Then everyone becomes an owl on one of two teams. The more you've earned, the bigger your owl!<br>🦃 Finale: the whole class vs. a GIANT TURKEY. Stain it before time runs out!<br>🚗 Hop in a car (fill up at Gobble Gas ⛽), ride 🚡 ziplines between roofs, and show off your 💃 dance moves.</p>
       <table class="small controls kb">
         <tr><td>Move / Jump</td><td>WASD / Space (twice to double jump)</td></tr>
         <tr><td>Aim / Shoot</td><td>Mouse / Click</td></tr>
@@ -55,6 +67,8 @@
         <tr><td>Hotdog scope</td><td>Right-click or Shift (Ketchup Sniper)</td></tr>
         <tr><td>Whipped cream bomb</td><td>G (blinds people)</td></tr>
         <tr><td>Shop</td><td>B</td></tr>
+        <tr><td>Drive / zipline</td><td>E near a car or a zipline pole (E again to get out)</td></tr>
+        <tr><td>Emotes</td><td>T, then 1-4</td></tr>
       </table>
       <table class="small controls tc">
         <tr><td>Move</td><td>Left thumb: drag anywhere on the left</td></tr>
@@ -64,6 +78,8 @@
         <tr><td>Weapons</td><td>Tap one in the bar at the bottom</td></tr>
         <tr><td>Hotdog scope</td><td>🌭 (Ketchup Sniper)</td></tr>
         <tr><td>Cream bomb / Shop</td><td>🍦 / 🛒 in the bottom bar</td></tr>
+        <tr><td>Drive / zipline</td><td>The 🚗 / 🚡 button that pops up nearby</td></tr>
+        <tr><td>Emotes</td><td>💃 in the bottom bar</td></tr>
       </table>
       <button id="playBtn">CLICK TO PLAY</button>
     </div>
@@ -81,7 +97,7 @@
     </div>
   </div>
 
-  <div id="results" class="overlay hidden"><div class="panel"><h1 id="resultsHead"></h1><div id="resultsBody"></div></div></div>
+  <div id="results" class="overlay hidden"><div id="confetti"></div><div class="panel"><h1 id="resultsHead"></h1><div id="resultsBody"></div></div></div>
 
   <div id="dead" class="overlay hidden"><div class="panel"><h1>🤢 STAINED!</h1><p id="deadMsg"></p></div></div>
 

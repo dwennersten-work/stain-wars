@@ -1,6 +1,6 @@
 // Shared by server (require) and client (window.Shared). Tweak gameplay numbers here.
 (function (S) {
-  S.ARENA = 80;            // arena half-size (meters)
+  S.ARENA = 140;           // arena half-size (meters): a 280m town, room for vehicles, ziplines and a boss
   S.SPEED = 8;             // walk speed
   S.GRAVITY = 22;
   S.JUMP = 9;
@@ -38,6 +38,7 @@
   // A game session: a free-for-all, then a team "Owl Showdown". Teacher can override both: stainwars newgame 15 5
   S.FFA_MIN = 15;
   S.TEAM_MIN = 5;
+  S.BOSS_MIN = 5;          // Thanksgiving boss battle: everyone vs. the giant turkey (stainwars newgame 15 5 5)
   S.RESULTS_MS = 30000;    // how long the final results stay up before free play resumes
   // Owl size is linear in stains earned (total money earned this game), relative to the top earner.
   // The hitbox and eye height scale too, so the biggest owl is the biggest (and most valuable) target.
@@ -65,7 +66,7 @@
     { id: 2, name: 'Spaghetti Whip',     icon: '🍝', cost: 60,  cd: 0.55, speed: 40,  life: 0.11, dmg: 35, grav: 0,  r: 0.5,  color: 0xf3d36b, desc: 'Wide melee lash, 4m reach' },
     { id: 3, name: 'Hamburger Grenade',  icon: '🍔', cost: 100, cd: 1.1,  speed: 17,  life: 2.5,  dmg: 55, grav: 18, r: 0.3,  splash: 4.5, lob: 4, color: 0x8b4513, desc: 'Lobbed, big splash' },
     { id: 4, name: 'Pie Launcher',       icon: '🥧', cost: 150, cd: 0.9,  speed: 24,  life: 2,    dmg: 60, grav: 9,  r: 0.28, splash: 2.2, lob: 2, color: 0xf5e6c8, desc: 'Heavy pie, small splash' },
-    { id: 5, name: 'Ketchup Sniper',     icon: '🌭', cost: 250, cd: 1.4,  speed: 140, life: 1.7,  dmg: 50, grav: 0,  r: 0.1,  head: 999, pierce: true, scope: true, twoHanded: true, noUpgrade: true, color: 0xe0001b, desc: 'Head = 1 shot, body = 2. Ignores outfits' },
+    { id: 5, name: 'Ketchup Sniper',     icon: '🌭', cost: 250, cd: 1.4,  speed: 140, life: 2.6, dmg: 50, grav: 0,  r: 0.1,  head: 999, pierce: true, scope: true, twoHanded: true, noUpgrade: true, color: 0xe0001b, desc: 'Head = 1 shot, body = 2. Ignores outfits' },
     { id: 6, name: 'Whipped Cream Bomb', icon: '🍦', cost: 30,  cd: 0.8,  speed: 16,  life: 1.4,  dmg: 0,  grav: 18, r: 0.25, blind: 10, lob: 4, pack: 3, maxAmmo: 6, color: 0xffffff, desc: 'Blinds nearby players. 3 per pack' },
   ];
   S.FLASH = 6;           // whipped cream bomb index (thrown with G, not a weapon slot)
@@ -84,10 +85,62 @@
   S.upgradeCost = (bought) => S.OUTFITS[bought + 1].cost;
   S.canUpgrade = (W) => W.dmg > 0 && !W.noUpgrade;
 
+  // Hits that aren't shop weapons: cars and the boss turkey's attacks. Same shape as a weapon so damage/kill feed code is shared.
+  // Ids start at 10 so they never clash with weapon slots, and players can never fire them (fire() only takes S.WEAPONS).
+  S.EXTRA = {
+    10: { name: 'Bumper',          icon: '🚗', dmg: 0,  color: 0x333333, noUpgrade: true },
+    11: { name: 'Gravy Bomb',      icon: '🥣', dmg: 35, color: 0x7a4a1c, speed: 25, life: 5, grav: 14, r: 0.5, splash: 5, noUpgrade: true },
+    12: { name: 'Cranberry Blast', icon: '🍒', dmg: 11, color: 0xb0102a, speed: 34, life: 2.5, grav: 3, r: 0.35, noUpgrade: true },
+    13: { name: 'Stuffing Rain',   icon: '🥖', dmg: 25, color: 0xc89b5a, speed: 25, life: 5, grav: 14, r: 0.4, splash: 3.5, noUpgrade: true },
+    14: { name: 'Drumstick Stomp', icon: '🍗', dmg: 45, color: 0xa0522d, noUpgrade: true },
+  };
+  S.W = (w) => S.WEAPONS[w] || S.EXTRA[w];
+  S.RUNOVER = 10; S.STOMP = 14;
+
+  // ---------- Vehicles ----------
+  // Server-driven: drivers send only throttle/steer, the server moves the car. Open-top so riders can shoot.
+  // Seats are [right, forward] offsets in the car's frame (forward = -z when ry = 0, like players). Seat 0 drives.
+  S.VEHICLE_TYPES = {
+    truck: { name: 'Taco Truck',     len: 5.4, wid: 2.6, hp: 450, top: 17, accel: 8,  turn: 1.5, color: 0x2ec4b6, seats: [[-0.6, -1.3], [0.6, -1.3], [-0.6, 0.9], [0.6, 0.9]] },
+    car:   { name: 'Pizza Buggy',    len: 4.2, wid: 2.3, hp: 300, top: 21, accel: 11, turn: 1.9, color: 0xff6b6b, seats: [[-0.55, -0.6], [0.55, -0.6], [-0.55, 0.9], [0.55, 0.9]] },
+    dog:   { name: 'Hot Dog Hauler', len: 4.6, wid: 2.3, hp: 320, top: 20, accel: 10, turn: 1.8, color: 0xe2583e, seats: [[-0.55, -0.7], [0.55, -0.7], [-0.55, 1.0], [0.55, 1.0]] },
+    cart:  { name: 'Lunch Cart',     len: 3.2, wid: 1.9, hp: 200, top: 24, accel: 14, turn: 2.3, color: 0xffd93d, seats: [[-0.45, -0.1], [0.45, -0.1]] },
+  };
+  S.VEH_RES = 0.5;          // vehicles shrug off half of every stain (sniper included)
+  S.VEH_H = 1.6;            // shots below this height hit the car, above it hit the riders
+  S.SEAT_Y = 0.45;          // riders' feet height
+  S.FUEL_MAX = 100; S.FUEL_BURN = 1.1; S.FUEL_FILL = 40;   // per second: ~90s of full throttle; a fill-up takes ~2.5s
+  S.VEH_RESPAWN_MS = 15000; S.STUCK_RESET_MS = 20000;     // washed-out cars come back; empty out-of-gas cars get towed home
+  S.ENTER_R = 2.5;          // how close to the car's body you must be to hop in
+  // Distance from a point to a car's body (a len x wid rectangle turned by ry). 0 = touching or inside.
+  S.vehDist = (type, vx, vz, ry, x, z) => {
+    const T = S.VEHICLE_TYPES[type], dx = x - vx, dz = z - vz;
+    const f = Math.abs(-dx * Math.sin(ry) - dz * Math.cos(ry)) - T.len / 2, r = Math.abs(dx * Math.cos(ry) - dz * Math.sin(ry)) - T.wid / 2;
+    return Math.hypot(Math.max(0, f), Math.max(0, r));
+  };
+  S.runoverDmg = (speed) => 10 + 2.5 * Math.abs(speed);  // 20 m/s = 60 stain
+
+  // ---------- Emotes ----------
+  S.EMOTES = [
+    { name: 'Disco Fever',     icon: '🪩' },
+    { name: 'Fish Belly Flop', icon: '🐟' },
+    { name: '6 7',             icon: '🖐️' },
+    { name: 'Orange Justice',  icon: '🍊' },
+  ];
+  S.EMOTE_MS = 8000;
+
+  // ---------- Ziplines ----------
+  S.ZIP_SPEED = 15;         // m/s, either direction (motorized, like the real ones at theme parks)
+  S.ZIP_HANG = 2.4;         // feet hang this far below the cable
+  S.ZIP_REACH = 2.6;        // how close your raised hand (feet + 2.2m) must be to the cable
+
+  // ---------- Thanksgiving boss: Tom Gobbleton, a giant turkey ----------
+  // HP scales with the class so it takes a few minutes of teamwork either way. Head hits do double damage.
+  S.BOSS = { name: 'Tom Gobbleton', r: 4, h: 10, headY: 8.6, headFwd: 2.6, headR: 1.7, roam: 30, speed: 3.5,
+    hpHuman: 4000, hpBot: 400, hpMin: 4000, stompR: 14, cashPer: 10 };
   // Deterministic map so server and clients agree. A box is a solid block from height y up to top.
   function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
   const r = rng(1234);
-  const COLORS = [0xff6b6b, 0xffd93d, 0x6bcB77, 0x4d96ff, 0xc77dff, 0xff9f1c, 0x2ec4b6];
   S.BOXES = [];
   S.BUILDINGS = [];
   const box = (x0, x1, z0, z1, y, top, color) => { if (x1 - x0 > 0.01 && z1 - z0 > 0.01) S.BOXES.push({ x: (x0 + x1) / 2, z: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0, y, top, color }); };
@@ -161,27 +214,74 @@
     box(x0, x1, z1 - WALL, z1, roof, roof + 1, TRIM_COLOR);
     box(x0, ax0, az0, az1, roof, roof + 1, TRIM_COLOR);
     box(ax1, x1, az0, az1, roof, roof + 1, TRIM_COLOR);
+    return S.BUILDINGS[S.BUILDINGS.length - 1];
   }
 
+  // ---------- The town: a 5x5 grid of blocks split by 14m streets ----------
+  // Only buildings (no crates or trees outside), so the streets are clear for driving.
+  // Center block = Town Square, the turkey's arena. North of it is the gas station, south of it a parking lot.
   // Three-story roofs (10.8m) are over the lethal 10m drop; two-story roofs (7.2m) are not, unless you jump up first.
-  building('FOOD COURT', 0, 0, 30, 22, 3, 0xff6b6b);
-  building('BURGER BARN', -42, -38, 22, 16, 2, 0xff9f1c);
-  building('PIZZA PALACE', 42, -38, 20, 18, 3, 0x2ec4b6);
-  building('TACO TOWN', -40, 40, 20, 16, 3, 0xc77dff);
-  building('NOODLE HOUSE', 42, 38, 24, 14, 2, 0xffd93d);
-  building('SODA FACTORY', 0, -62, 24, 12, 2, 0x4d96ff);
-  building('PIE SHOP', 0, 62, 24, 12, 2, 0xff85c0);
-  building('DONUT DEPOT', -62, 0, 16, 18, 2, 0x6bcB77);
-  building('HOT DOG HUT', 62, 0, 16, 18, 2, 0xe2583e);
-  // Sniper lookouts in the corners: 18m roofs that can see the whole map.
-  for (const [x, z] of [[-66, -66], [66, -66], [-66, 66], [66, 66]]) building('LOOKOUT', x, z, 12, 8, 5, 0x7b6d8d, -4);
-
-  // Scattered crates outside, keeping clear of the buildings so doors stay open.
-  for (let i = 0; i < 70; i++) {
-    const x = (r() * 2 - 1) * (S.ARENA - 5), z = (r() * 2 - 1) * (S.ARENA - 5), w = 2 + r() * 5, d = 2 + r() * 5, h = 1 + r() * 3;
-    if (S.BUILDINGS.some(B => Math.abs(x - B.x) < B.w / 2 + w / 2 + 3 && Math.abs(z - B.z) < B.d / 2 + d / 2 + 3)) continue;
-    box(x - w / 2, x + w / 2, z - d / 2, z + d / 2, 0, h, COLORS[i % COLORS.length]);
+  S.STREET_W = 14;
+  S.STREETS = [-84, -28, 28, 84];            // street center lines, in both directions
+  S.BLOCKS = [-115.5, -56, 0, 56, 115.5];    // block centers (edge blocks are 49m, inner ones 42m)
+  const LOOK = ['LOOKOUT', 12, 8, 5, 0x7b6d8d];
+  const TOWN = [   // [name, w, d, floors, color] row by row from north (-z) to south; null = open space
+    [LOOK, ['BURGER BARN', 22, 16, 2, 0xff9f1c], ['SODA FACTORY', 24, 14, 2, 0x4d96ff], ['CORN DOG CORNER', 20, 16, 3, 0xe9c46a], LOOK],
+    [['DONUT DEPOT', 16, 18, 2, 0x6bcB77], ['NOODLE HOUSE', 24, 14, 2, 0xffd93d], null, ['PIZZA PALACE', 20, 18, 3, 0x2ec4b6], ['HOT DOG HUT', 16, 18, 2, 0xe2583e]],
+    [['PIE SHOP', 24, 12, 2, 0xff85c0], ['FOOD COURT', 30, 22, 3, 0xff6b6b], null, ['TACO TOWN', 20, 16, 3, 0xc77dff], ['CRANBERRY CAFE', 20, 14, 2, 0xd62839]],
+    [['MASHED POTATO MALL', 26, 18, 2, 0xb8a1e3], ['GRAVY GARAGE', 20, 16, 3, 0x9c6644], null, ['STUFFING STATION', 22, 16, 3, 0x52b788], ['YAM JAM', 18, 16, 2, 0xf4a261]],
+    [LOOK, ['CASSEROLE CORNER', 20, 14, 2, 0x90be6d], ['PUMPKIN PANTRY', 24, 16, 3, 0xff7b00], ['CORN CASTLE', 20, 16, 2, 0xffd166], LOOK],
+  ];
+  const B_ = {}, lookouts = [];
+  // FOOD COURT first: tests and older code treat S.BUILDINGS[0] as the big one.
+  const order = [];
+  TOWN.forEach((row, j) => row.forEach((t, i) => t && order.push([t, S.BLOCKS[i], S.BLOCKS[j]])));
+  order.sort((a, b) => (b[0][0] === 'FOOD COURT') - (a[0][0] === 'FOOD COURT'));
+  for (const [[name, w, d, floors, color], x, z] of order) {
+    const B = building(name, x, z, w, d, floors, color, name === 'LOOKOUT' ? -4 : 0);
+    if (name === 'LOOKOUT') lookouts.push(B); else B_[name] = B;
   }
+
+  // Gas station "Gobble Gas": drive onto the pad to refuel. A canopy on 4 posts just outside the pad, and two pump islands
+  // with lanes around them, so you can drive through either way.
+  S.GAS = { x0: -14, x1: 14, z0: -66, z1: -46, name: 'GOBBLE GAS' };
+  for (const x of [-15, 15]) for (const z of [-64, -48]) box(x - 0.3, x + 0.3, z - 0.3, z + 0.3, 0, 5.2, 0xffffff);
+  box(-15.5, 15.5, -64.5, -47.5, 5.2, 5.8, 0xe63946);
+  for (const z of [-60, -52]) box(-5, 5, z - 0.5, z + 0.5, 0, 1.4, 0xf1faee);
+
+  // Ziplines between roofs, across streets. Each end has a pole near the roof edge (the pole is just for looks)
+  // and a landing spot a couple of meters further in. E/W poles sit near the south wall, clear of the stair hole.
+  S.ZIPLINES = [];
+  function anchor(B, side) {
+    const sz = B.az1 - 1.5, nx = B.x + B.w / 2 - 2.5, top = B.roof + S.ZIP_HANG + 1;
+    const p = { E: [B.x + B.w / 2 - 1.3, sz, -2, 0], W: [B.x - B.w / 2 + 1.3, sz, 2, 0], N: [nx, B.z - B.d / 2 + 1.3, 0, 2], S: [nx, B.z + B.d / 2 - 1.3, 0, -2] }[side];
+    return { pole: [p[0], B.roof, p[1]], top: [p[0], top, p[1]], land: [p[0] + p[2], B.roof, p[1] + p[3]] };
+  }
+  const zip = (A, sa, B, sb) => {
+    const a = anchor(A, sa), b = anchor(B, sb);
+    S.ZIPLINES.push({ a: a.top, b: b.top, la: a.land, lb: b.land, pa: a.pole, pb: b.pole, len: Math.hypot(b.top[0] - a.top[0], b.top[1] - a.top[1], b.top[2] - a.top[2]) });
+  };
+  const [NW, NE, SW, SE] = [...lookouts].sort((a, b) => a.z - b.z || a.x - b.x);
+  zip(B_['PIE SHOP'], 'E', B_['FOOD COURT'], 'W');
+  zip(B_['FOOD COURT'], 'E', B_['TACO TOWN'], 'W');            // right over the turkey's square
+  zip(B_['TACO TOWN'], 'E', B_['CRANBERRY CAFE'], 'W');
+  zip(B_['NOODLE HOUSE'], 'S', B_['FOOD COURT'], 'N');
+  zip(B_['PIZZA PALACE'], 'S', B_['TACO TOWN'], 'N');
+  zip(B_['GRAVY GARAGE'], 'E', B_['STUFFING STATION'], 'W');   // over the parking lot
+  zip(NW, 'E', B_['BURGER BARN'], 'W');                         // long slides down from the lookouts
+  zip(NE, 'W', B_['CORN DOG CORNER'], 'E');
+  zip(SW, 'E', B_['CASSEROLE CORNER'], 'W');
+  zip(SE, 'W', B_['CORN CASTLE'], 'E');
+  // Point on a cable at t (0 = end a, 1 = end b), and the t closest to a point.
+  S.zipPoint = (L, t) => [0, 1, 2].map(k => L.a[k] + (L.b[k] - L.a[k]) * t);
+  S.zipClosest = (L, x, y, z) => {
+    const d = [0, 1, 2].map(k => L.b[k] - L.a[k]), l2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+    return Math.max(0, Math.min(1, ((x - L.a[0]) * d[0] + (y - L.a[1]) * d[1] + (z - L.a[2]) * d[2]) / l2));
+  };
+
+  // 8 vehicles: 4 in the parking lot south of the square, 4 parked on streets around town. [type, x, z, ry]
+  S.VEHICLES = [['truck', -7, 50, 0], ['car', 7, 50, 0], ['dog', -7, 63, 0], ['cart', 7, 63, 0],
+    ['car', -56, 28, Math.PI / 2], ['dog', 56, -28, -Math.PI / 2], ['truck', -28, -90, 0], ['cart', 28, 90, Math.PI]];
 
   // Grid of nearby boxes, so collision stays cheap with this many boxes (kept private: it isn't gameplay data).
   const CELL = 6, N = Math.ceil(S.ARENA * 2 / CELL) + 1, grid = Array.from({ length: N * N }, () => []);
@@ -194,11 +294,12 @@
   }
   const over = (b, x, z) => Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2;
 
-  // Clear of every box by enough room for the biggest owl.
-  S.randomSpawn = () => {
+  // Clear of every box by enough room for the biggest owl. awayFromCenter keeps boss-fight spawns out of stomping range.
+  S.randomSpawn = (awayFromCenter = 0) => {
     const m = S.RADIUS * S.OWL_MAX + 0.5;
     for (;;) {
       const p = { x: (Math.random() * 2 - 1) * (S.ARENA - 3), y: 0, z: (Math.random() * 2 - 1) * (S.ARENA - 3) };
+      if (Math.hypot(p.x, p.z) < awayFromCenter) continue;
       if (!S.BOXES.some(b => Math.abs(p.x - b.x) < b.w / 2 + m && Math.abs(p.z - b.z) < b.d / 2 + m)) return p;
     }
   };
@@ -207,7 +308,7 @@
   // Each box is one of: under the feet (ground), just over the head (ceiling), clear above, or in the way (push out).
   // A ceiling must be over the player's center: a door lintel at head height in front of a big owl is a wall, not a ceiling.
   S.resolve = (p) => {
-    const s = S.bodyScale(p), R = S.RADIUS * s, H = S.HEADROOM * s;
+    const s = S.bodyScale(p), R = p.rad || S.RADIUS * s, H = p.hgt || S.HEADROOM * s;   // rad/hgt: vehicles
     let ground = 0, ceil = Infinity;
     for (let pass = 0; pass < 2; pass++) {   // twice, so a corner can't push you from one wall into the other
       ground = 0; ceil = Infinity;

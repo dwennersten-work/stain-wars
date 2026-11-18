@@ -7,13 +7,13 @@
 - `public/shared.js`: constants used by BOTH server (require) and client (global `Shared`): outfits, weapons, map gen, collision. Change gameplay numbers here.
 - `public/index.html`, `public/game.js`, `public/style.css`: Three.js client (ES module, Three from unpkg via importmap, no build step).
 - `install.sh`: droplet installer (Ubuntu). Clones the repo to `/opt/stainwars`, systemd service `stainwars`, port 80. `BRANCH=<name>` installs a branch for testing.
-- `tests/`: simulations of the real server and map code (`npm test`, also try `DT=0.05 npm test`).
+- `tests/`: simulations of the real server and map code (`npm test`, also try `DT=0.05 npm test`). `sim_features.js` covers vehicles, ziplines, emotes and the turkey boss.
 - `scripts/admin.sh`: teacher CLI, symlinked to `/usr/local/bin/stainwars`. `stainwars student add '<key>'` gives a student a menu-only SSH login (`student-shell`).
 - `student_access.md`: beginner guide for that student (Windows/Mac SSH setup, game-day commands). Keep it in sync when menu commands change.
 
 ## Run locally
 `npm install && npm start`, then open http://localhost:3000 (PORT env overrides).
-Admin: `curl localhost:3000/admin/status`, `/admin/newgame?ffa=15&team=5` (minutes; decimals work for quick tests), `/admin/skip`, `/admin/stop`, `/admin/bots?n=10`, `/admin/nobots`, `/admin/reset`.
+Admin: `curl localhost:3000/admin/status`, `/admin/newgame?ffa=15&team=5&boss=5` (minutes; decimals work for quick tests), `/admin/boss?min=5`, `/admin/skip`, `/admin/stop`, `/admin/bots?n=10`, `/admin/nobots`, `/admin/reset`.
 
 ## Conventions
 - Keep it simple: MVP quality, minimal error checking, no build tooling, no extra dependencies.
@@ -23,7 +23,7 @@ Admin: `curl localhost:3000/admin/status`, `/admin/newgame?ffa=15&team=5` (minut
 
 ## Security rules (see `decisions.md` → Security)
 - **Never trust the client.** Validate every socket message in the server: types, `Number.isInteger` for indexes (blocks `__proto__`), `Number.isFinite` for numbers. Clients send intent or positions only. Money, damage, tiers, hits and fire rate are decided on the server.
-- New gameplay that affects movement must keep `clientMove` in sync (speed, jump and gravity limits).
+- New gameplay that affects movement must keep `clientMove` in sync (speed, jump and gravity limits). Cars and ziplines are moved by the server; `clientMove` takes only the look direction from riders.
 - Never commit secrets (tokens, passwords, `.env`). The repo is public. Never put DigitalOcean credentials on the droplet.
 - Keep the service non-root and sandboxed in `install.sh`. The server must not need to write files.
 - New admin features stay localhost-only, or get a password if they're ever exposed.

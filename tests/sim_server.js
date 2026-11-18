@@ -6,7 +6,8 @@ const DT = +process.env.DT || 0.0166667;
 let fake = 1e12; const realNow = Date.now; Date.now = () => fake;
 let src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
 src = src.replace(/setInterval\(\(\) => console\.log[^\n]*\n/, '');
-src += `\nmodule.exports = { players, projectiles, newPlayer, clientMove, damage, buyTray, buyUpgrade, buyWeapon, equip, fire, stepProjectiles, stepBot, addBot, endProjectile, trayUp, S, io, server };\n`;
+src += `\nmodule.exports = { players, projectiles, newPlayer, clientMove, damage, buyTray, buyUpgrade, buyWeapon, equip, fire, stepProjectiles, stepBot, addBot, endProjectile, trayUp, S, io, server,
+  vehicles, enterVehicle, leaveVehicle, driveInput, stepVehicles, hitVehicle, resetVehicle, zipToggle, stepZip, emote, startGame, advance, stepBoss, hurtBoss, boss, session, freePlay, respawn };\n`;
 const m = new Module(path.join(ROOT, 'server.js')); m.filename = path.join(ROOT, 'server.js'); m.paths = Module._nodeModulePaths(ROOT);
 m._compile(src, m.filename);
 const { players, projectiles, newPlayer, clientMove, damage, buyTray, buyUpgrade, equip, fire, stepProjectiles, addBot, trayUp, S, io, server } = m.exports;
@@ -313,6 +314,7 @@ const wait = (ms) => new Promise(r => { const t = realNow(); const i = setInterv
     const dist = Math.hypot(tg.p.x - sn.p.x, tg.p.z - sn.p.z);
     fire(sn.p, 5, [tg.p.x - sn.p.x, 0, tg.p.z - sn.p.z]);
     for (let i = 0; i < 60 && projectiles.size; i++) stepProjectiles(1 / 30);
+    for (let i = 0; i < 60 && projectiles.size; i++) stepProjectiles(1 / 30);   // the town is big: 327m takes ~2.3s
     check(`sniper reaches the far corner tower (${dist.toFixed(0)}m)`, tg.p.hp === 50, `hp=${tg.p.hp}`);
     remove(sn); remove(tg);
   }
@@ -350,7 +352,12 @@ const wait = (ms) => new Promise(r => { const t = realNow(); const i = setInterv
     for (let i = 0; i < 300; i++) { adv(33); for (const b of bots) m.exports.stepBot(b, 1 / 30); stepProjectiles(1 / 30); ticks++; }
     const ms = Number(process.hrtime.bigint() - t0) / 1e6 / ticks;
     check('50 bots, 10s of game, no crash', true, `${ms.toFixed(2)} ms per 33ms tick, ${projectiles.size} projectiles, ${bots.filter(b => b.y > 0.5).length} bots off the ground`);
+    for (const b of bots) players.delete(b.id);
+    projectiles.clear();
   }
+
+  // ---------- 10+. Vehicles, ziplines, emotes, the turkey boss ----------
+  require('./sim_features.js')({ ...m.exports, client, send, step, idle, check, adv, remove, now: () => fake });
   console.log(fails ? `\n${fails} FAILURES` : '\nALL OK');
   process.exit(fails ? 1 : 0);
 })();

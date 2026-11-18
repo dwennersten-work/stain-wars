@@ -65,6 +65,45 @@ button:disabled { background: #888; cursor: default; }
 .item.cur { outline: 3px solid #ffe600; }
 .item .lv { color: #ffe600; }
 
+/* Turkey boss bar, interaction prompt, vehicle HUD, emote wheel, minimap */
+#bossBar { position: fixed; left: 50%; top: 74px; transform: translateX(-50%); width: min(520px, 70vw); text-align: center; text-shadow: 2px 2px 0 #000; pointer-events: none; }
+#bossName { font-size: 22px; font-weight: bold; color: #ffd166; }
+#bossName small { font-size: 13px; color: #fff; }
+#bossHpWrap { position: relative; height: 22px; background: #3a1a00; border: 3px solid #000; border-radius: 10px; overflow: hidden; margin-top: 2px; }
+#bossHp { height: 100%; width: 100%; background: linear-gradient(90deg, #d62828, #f77f00, #fcbf49); transition: width 0.2s; }
+#bossHpText { position: absolute; inset: 0; font-size: 13px; line-height: 16px; }
+#prompt { position: fixed; left: 50%; top: 62%; transform: translateX(-50%); font-size: 20px; background: rgba(0,0,0,0.55); padding: 6px 16px; border-radius: 12px; border: 2px solid #ffe600; text-shadow: 1px 1px 0 #000; pointer-events: none; white-space: nowrap; }
+#vehHud { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: 400px; background: rgba(0,0,0,0.5); padding: 8px 14px; border-radius: 14px; text-shadow: 1px 1px 0 #000; pointer-events: none; font-size: 15px; }
+#vehName { font-weight: bold; font-size: 17px; margin-bottom: 4px; }
+.vbar { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.vtrack { flex: 1; height: 12px; background: #222; border: 2px solid #000; border-radius: 6px; overflow: hidden; }
+#vehHp { height: 100%; background: #3f3; }
+#vehFuel { height: 100%; background: linear-gradient(90deg, #f80, #fd0); }
+#vehMsg { font-size: 13px; color: #ffe600; margin-top: 2px; }
+#emoteWheel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(40,0,60,0.85); border: 4px solid #ffe600; border-radius: 20px; padding: 12px 18px; z-index: 8; min-width: 260px; }
+#emoteWheel .ewTitle { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 6px; text-shadow: 2px 2px 0 #000; }
+#emoteWheel [data-e] { font-size: 20px; padding: 6px 10px; margin: 4px 0; background: rgba(255,255,255,0.12); border-radius: 10px; cursor: pointer; }
+#emoteWheel [data-e]:hover { background: rgba(255,230,0,0.35); }
+#emoteWheel .ewHint { font-size: 12px; opacity: 0.8; text-align: center; margin-top: 6px; }
+#minimap { position: fixed; right: 12px; bottom: 12px; width: 180px; height: 180px; border: 3px solid #000; border-radius: 12px; opacity: 0.9; pointer-events: none; }
+
+/* Results: Thanksgiving feast confetti */
+#results .panel { position: relative; z-index: 1; }
+#confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+#confetti span { position: absolute; top: -60px; animation: fall 4.5s linear infinite; }
+@keyframes fall { to { transform: translateY(115vh) rotate(540deg); } }
+
+/* Thanksgiving theme (boss fight): harvest colors everywhere */
+body.thanks { background: #ffb36b; }
+body.thanks .panel { background: linear-gradient(135deg, #d35400, #6b3410); border-color: #ffd166; box-shadow: 0 10px 0 #3a1a00; }
+body.thanks #hpBar { background: linear-gradient(90deg, #fcbf49, #f77f00); }
+body.thanks #weapons div.on { border-color: #ffd166; background: rgba(247,127,0,0.4); }
+body.thanks #board, body.thanks #clockText, body.thanks #killfeed div { background: rgba(90,40,0,0.55); }
+body.thanks #popup, body.thanks #weaponName, body.thanks #board li.me { color: #ffd166; }
+body.thanks #money { color: #fcbf49; }
+body.thanks .overlay { background: rgba(90, 30, 0, 0.5); }
+#results.feast { background: rgba(120, 50, 0, 0.45); }
+
 /* Hotdog scope */
 #scope { position: fixed; inset: 0; display: none; pointer-events: none; background: radial-gradient(circle at center, transparent 0 26vmin, #3a1c06 26.5vmin); }
 #scope.on { display: block; }
@@ -116,6 +155,15 @@ body.touch #board li { white-space: nowrap; overflow: hidden; text-overflow: ell
 body.touch #teamBoards { display: none; }
 body.touch #popup { font-size: 20px; top: 20%; white-space: normal; width: 70vw; text-align: center; }
 body.touch #dead { pointer-events: none; background: rgba(40, 0, 60, 0.3); }
+body.touch #minimap { display: none; }
+body.touch #tbAct { right: calc(118px + var(--sr)); bottom: calc(140px + var(--sb)); width: 64px; height: 64px; font-size: 30px; background: rgba(255,230,0,0.35); }
+body.touch #prompt { top: auto; bottom: calc(220px + var(--sb)); font-size: 14px; }
+body.touch #vehHud { width: 240px; bottom: calc(52px + var(--sb)); font-size: 11px; padding: 4px 10px; }
+body.touch #vehName { font-size: 13px; }
+body.touch #bossBar { top: 40px; width: 45vw; }
+body.touch #bossName { font-size: 14px; }
+body.touch #bossName small { display: none; }
+body.touch #emoteWheel [data-e] { font-size: 18px; padding: 10px; }
 
 /* Panels have to fit a phone on its side (about 360px tall) */
 body.touch .panel { padding: 10px 16px; max-height: calc(100dvh - 12px); overflow-y: auto; border-width: 4px; box-shadow: 0 5px 0 #3a0066; -webkit-overflow-scrolling: touch; }

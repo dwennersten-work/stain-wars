@@ -75,6 +75,20 @@
 - [x] Merged mobile-support to main (v1.3.0-beta.1); `stainwars update` now gets the student login
 - [ ] Class size vs `MAX_PER_IP = 40` in server.js: a whole class behind one school IP (NAT) counts as one IP. Raise it if more than 40 players
 
+## Phase 8 — Crazy branch (`crazy_stain_wars_branch`, game-day playtest server)
+- [x] Town map: 280m × 280m, streets, 22 buildings, no outdoor clutter, skyline
+- [x] Turkey Boss phase (Thanksgiving): Tom Gobbleton, 4 attacks, HP bar, settable minutes, win/lose screens, autumn theme
+- [x] 8 drivable vehicles with passengers, run-over stains, stain resistance, fuel, Gobble Gas station, tow-home
+- [x] Emotes: Disco Fever, Fish Belly Flop, 6 7 (6- and 7-fingered hands), Orange Justice, with synthesized music
+- [x] Ziplines between roofs (10), server-moved
+- [x] Minimap, interaction prompts, touch buttons for all of it
+- [x] Tests: `tests/sim_features.js` (cars, ziplines, emotes, boss) and map checks (cables clear, landing spots, gas lanes)
+- [ ] Install on a second droplet and play it with a few people before game day
+- [ ] Playtest: turkey HP per student (4,000), attack rate, stomp radius; car speeds, fuel burn, run-over damage
+- [ ] Check frame rate on school laptops with the bigger town (3,262 boxes, still one draw call)
+- [ ] Check speech synthesis ("six seven") on Chromebooks and iPhone Safari
+- [ ] Maybe: bots that drive, gas cans, seat switching, turkey that leaves the square
+
 ## Later (ideas, not started)
 - [ ] Minimap or compass, now that the map is bigger
 - [ ] Teach bots to use stairs (today they only wander up by accident)

@@ -76,8 +76,9 @@ You're in! Type commands after `stainwars>` and press Enter.
 | Type this | What it does |
 |---|---|
 | `status` | Game phase, time left, team scores, number of players and bots |
-| `newgame` | Start a 20-minute game: 15 min free-for-all, then a 5 min Owl Showdown (teams) |
-| `newgame 10 3` | Custom times: 10 min free-for-all + 3 min Owl Showdown |
+| `newgame` | Start a 25-minute game: 15 min free-for-all, a 5 min Owl Showdown (teams), then a 5 min Turkey Boss (everyone vs. a giant turkey) |
+| `newgame 10 3 4` | Custom times: 10 min free-for-all + 3 min Owl Showdown + 4 min Turkey Boss (a `0` skips that part) |
+| `boss 5` | Jump straight into a 5 min turkey boss fight. Wipes everyone's stuff like `newgame`. |
 | `skip` | Jump to the next phase right now |
 | `stop` | End the game, back to free play (everyone keeps their stuff) |
 | `url` | Show the link players use to join |

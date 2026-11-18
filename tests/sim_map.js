@@ -106,6 +106,33 @@ for (const scale of [0.8, 1.3, 1.6, 2.5]) {
   for (let i = 0; i < 300; i++) { const p = { ...S.randomSpawn(), scale: S.OWL_MAX }, x = p.x, z = p.z; S.resolve(p); if (p.x !== x || p.z !== z) stuck++; }
   console.log(`${stuck ? 'FAIL' : 'ok  '} giant owl spawns clear of boxes (${stuck} pushed)`); if (stuck) fails++;
 }
+// Ziplines: the cable and the rider hanging under it are clear of every box (except right at the poles), and both
+// landing spots are solid roof (not the stair hole), so a ride always ends standing on the roof.
+S.ZIPLINES.forEach((L, i) => {
+  let blocked = 0;
+  for (let t = 0.04; t <= 0.96; t += 0.005) {
+    const c = S.zipPoint(L, t);
+    for (const dy of [0, 1.2, S.ZIP_HANG]) if (S.inBox(c[0], c[1] - dy, c[2])) blocked++;
+  }
+  const lands = [L.la, L.lb].every(p => { const q = { x: p[0], y: p[1], z: p[2] }; return Math.abs(S.resolve(q) - p[1]) < 0.01 && q.x === p[0] && q.z === p[2]; });
+  const ok = !blocked && lands;
+  console.log(`${ok ? 'ok  ' : 'FAIL'} zipline ${i}: ${L.len.toFixed(0)}m, ${L.a[1].toFixed(1)}m -> ${L.b[1].toFixed(1)}m${blocked ? ` blocked at ${blocked} samples` : ''}${lands ? '' : ' (bad landing spot)'}`);
+  if (!ok) fails++;
+});
+// Cars spawn clear of boxes (checked like the server does: two circles along the car), and the gas station has
+// driving lanes through it.
+for (const [type, x, z, ry] of S.VEHICLES) {
+  const T = S.VEHICLE_TYPES[type], off = T.len / 2 - T.wid / 2;
+  const stuck = [off, -off].some(s => { const q = { x: x - Math.sin(ry) * s, y: 0, z: z - Math.cos(ry) * s, rad: T.wid / 2, hgt: 1.5 }, x0 = q.x, z0 = q.z; S.resolve(q); return q.x !== x0 || q.z !== z0; });
+  if (stuck) { console.log(`FAIL ${T.name} at (${x}, ${z}) spawns inside something`); fails++; }
+}
+for (const [alongX, at] of [[1, -63], [1, -56], [1, -49], [0, -9.5], [0, 9.5]]) {
+  let clear = true;
+  for (let t = alongX ? S.GAS.x0 : S.GAS.z0; t <= (alongX ? S.GAS.x1 : S.GAS.z1); t += 0.5) for (const d of [-1.3, 0, 1.3]) {
+    if (alongX ? S.inBox(t, 0.5, at + d) : S.inBox(at + d, 0.5, t)) clear = false;
+  }
+  if (!clear) { console.log(`FAIL gas station lane ${alongX ? 'z' : 'x'}=${at} is blocked`); fails++; }
+}
 // Nothing thinner than the projectile step: every wall/floor thick enough, and all boxes in bounds.
 const thin = S.BOXES.filter(b => b.top - b.y < 0.3);
 const out = S.BOXES.filter(b => Math.abs(b.x) + b.w / 2 > S.ARENA || Math.abs(b.z) + b.d / 2 > S.ARENA);
