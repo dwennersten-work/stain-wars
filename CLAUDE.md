@@ -8,7 +8,8 @@
 - `public/index.html`, `public/game.js`, `public/style.css`: Three.js client (ES module, Three from unpkg via importmap, no build step).
 - `install.sh`: droplet installer (Ubuntu). Clones the repo to `/opt/stainwars`, systemd service `stainwars`, port 80. `BRANCH=<name>` installs a branch for testing.
 - `tests/`: simulations of the real server and map code (`npm test`, also try `DT=0.05 npm test`).
-- `scripts/admin.sh`: teacher CLI, symlinked to `/usr/local/bin/stainwars`.
+- `scripts/admin.sh`: teacher CLI, symlinked to `/usr/local/bin/stainwars`. `stainwars student add '<key>'` gives a student a menu-only SSH login (`student-shell`).
+- `student_access.md`: beginner guide for that student (Windows/Mac SSH setup, game-day commands). Keep it in sync when menu commands change.
 
 ## Run locally
 `npm install && npm start`, then open http://localhost:3000 (PORT env overrides).
@@ -26,6 +27,7 @@ Admin: `curl localhost:3000/admin/status`, `/admin/newgame?ffa=15&team=5` (minut
 - Never commit secrets (tokens, passwords, `.env`). The repo is public. Never put DigitalOcean credentials on the droplet.
 - Keep the service non-root and sandboxed in `install.sh`. The server must not need to write files.
 - New admin features stay localhost-only, or get a password if they're ever exposed.
+- The student login (`student-shell` in `admin.sh`) only allows allow-listed commands with numeric arguments. Never add anything that opens a shell, pager or editor (`less`, `vi`, `read -e`, `journalctl` without `--no-pager`).
 - Avoid new dependencies. If one is added, commit `package-lock.json` (the installer uses `npm ci`).
 - Never render player-controlled text with `innerHTML` (use `textContent`). Today, names are server-picked.
 - Repo: https://github.com/dwennersten-work/stain-wars (public; install.sh pulls from it).

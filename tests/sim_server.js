@@ -325,6 +325,23 @@ const wait = (ms) => new Promise(r => { const t = realNow(); const i = setInterv
     check('normal eye unchanged', S.eyeHeight(10, 0, 22, 1) === 1.6);
   }
 
+  // ---------- 8b. Strafing shots start where the shooter really is ----------
+  // The client sends its position right before each shot, so the server's origin is the client's spot, not up to 50ms stale.
+  {
+    const A = client(10, 22);
+    const before = new Set(projectiles.keys());
+    A.frame = 0; adv(1000); send(A);   // a regular 20Hz send just happened
+    step(A, 1, 0, false, 0.02); step(A, 1, 0, false, 0.02);   // strafe right for 40ms, before the next one
+    const stale = Math.abs(A.p.x - A.c.x);
+    send(A); A.p.lastShot = 0; A.p.lastFire = A.p.lastFire.map(() => 0);
+    fire(A.p, 0, [0, 0, -1]);
+    const pr = [...projectiles.values()].find(q => !before.has(q.id) && q.owner === A.p.id);
+    check('strafing leaves the server copy behind (test setup)', stale > 0.1, `${stale.toFixed(2)}m`);
+    check('strafing shot starts at the client position', pr && Math.abs(pr.x - A.c.x) < 0.02, `stale gap would be ${stale.toFixed(2)}m, now ${pr ? Math.abs(pr.x - A.c.x).toFixed(3) : '?'}m`);
+    if (pr) projectiles.delete(pr.id);
+    remove(A);
+  }
+
   // ---------- 9. Load: 50 bots ----------
   {
     for (let i = 0; i < 50; i++) addBot();
