@@ -32,11 +32,12 @@ case "$1" in
         mkdir -p /home/student/.ssh
         # restrict = no port forwarding, file copy, etc.; pty = needed for htop; command = always the menu below, never a shell.
         echo "restrict,pty,command=\"/usr/local/bin/stainwars student-shell\" $KEY student" > /home/student/.ssh/authorized_keys
-        chown -R student:student /home/student/.ssh
-        chmod 700 /home/student/.ssh && chmod 600 /home/student/.ssh/authorized_keys
+        # Root owns the whole home: even if the student found a way to write a file, they can't edit their key's limits or .bashrc.
+        chown -R root:root /home/student && chmod 755 /home/student /home/student/.ssh && chmod 644 /home/student/.ssh/authorized_keys
         echo "Student can now run: ssh student@$("$0" url | sed 's#http://##; s#:.*##')" ;;
       remove)
-        pkill -u student 2>/dev/null; userdel -r student 2>/dev/null && echo "student removed" || echo "no student user" ;;
+        # userdel -r skips a home the user doesn't own, so remove it ourselves.
+        pkill -u student 2>/dev/null; userdel student 2>/dev/null && rm -rf /home/student && echo "student removed" || echo "no student user" ;;
       *) echo "usage: stainwars student add 'ssh-ed25519 AAAA...' | student remove" ;;
     esac ;;
   student-shell)

@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, 'public');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
 // Abuse limits. Per-IP is generous because a whole classroom shares one school IP (NAT).
-const MAX_HUMANS = 80, MAX_PER_IP = 40, MAX_MSGS_PER_SEC = 60;
+const MAX_HUMANS = 80, MAX_PER_IP = 40, MAX_MSGS_PER_SEC = 60, MAX_BOTS = 150;
 // Anti kill-farming (students feeding kills from extra tabs): idle victims pay nothing, repeat kills on the
 // same victim pay half each time, and income is capped near what a great legit player can earn.
 const IDLE_MS = 15000, REPEAT_MS = 120000, EARN_PER_SEC = 5, EARN_MAX = 500;
@@ -24,14 +24,15 @@ const session = { phase: 'free', endsAt: 0, teamMs: 0, scores: [0, 0], results: 
 
 // ---------- HTTP: static files + localhost-only admin ----------
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, 'http://x');
+  let url;   // a bad path like "//" makes new URL throw, which used to crash the whole server
+  try { url = new URL(req.url, 'http://x'); } catch { res.writeHead(400); return res.end(); }
   if (url.pathname.startsWith('/admin/')) {
     const ip = req.socket.remoteAddress;
     if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip)) { res.writeHead(403); return res.end('localhost only'); }
     return admin(url, res);
   }
   const file = path.join(PUB, path.normalize(url.pathname === '/' ? '/index.html' : url.pathname));
-  if (!file.startsWith(PUB)) { res.writeHead(404); return res.end(); }
+  if (!file.startsWith(PUB + path.sep)) { res.writeHead(404); return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream',
@@ -58,9 +59,10 @@ function admin(url, res) {
     setPhase('free', 0);
     msg = 'Game stopped. Everyone reset to Plain Beige Tee, mustard only, $0, 0 kills.';
   } else if (cmd === 'bots') {
-    const n = Math.min(100, parseInt(url.searchParams.get('n')) || 10);
+    const have = [...players.values()].filter(p => p.bot).length;   // total cap: repeated "bots 100" could swamp a small droplet
+    const n = Math.max(0, Math.min(100, MAX_BOTS - have, parseInt(url.searchParams.get('n')) || 10));
     for (let i = 0; i < n; i++) addBot();
-    msg = `Added ${n} derpy bots.`;
+    msg = `Added ${n} derpy bots` + (n < 100 && have + n >= MAX_BOTS ? ` (max ${MAX_BOTS} bots).` : '.');
   } else if (cmd === 'nobots') {
     for (const p of players.values()) if (p.bot) players.delete(p.id);
     msg = 'All bots removed.';
@@ -548,4 +550,6 @@ setInterval(() => {
 }, TICK * 1000);
 
 setInterval(() => console.log(new Date().toISOString(), status()), 30000);
+// Log unexpected errors instead of dying: a restart would wipe the game in progress mid-class.
+process.on('uncaughtException', (e) => console.error(new Date().toISOString(), 'uncaught', e));
 server.listen(PORT, () => console.log(`Stain Wars on http://localhost:${PORT}`));

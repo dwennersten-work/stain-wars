@@ -26,7 +26,7 @@ Re-run it to get newer commits from that branch. To go back, run the normal inst
 | `stainwars stop` | End the game, back to free play (everyone keeps their stuff) |
 | `stainwars url` | Print the link to give students (`http://<droplet-ip>`) |
 | `stainwars status` | Game phase, time left, team score, humans, bots, projectiles in flight, server memory |
-| `stainwars bots 20` | Add 20 derpy bots (more load!) |
+| `stainwars bots 20` | Add 20 derpy bots (more load!). At most 150 bots in total |
 | `stainwars nobots` | Remove bots |
 | `stainwars reset` | Stop any game; everyone back to Plain Beige Tee and $0 |
 | `stainwars logs` | Follow the server log |
