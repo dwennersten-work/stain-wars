@@ -66,6 +66,13 @@
 - [ ] Playtest with a real class: map size, tray price/HP, level thresholds, whether lookouts are too strong
 - [ ] Check frame rate on real school laptops (tested only on a software renderer so far)
 
+## Phase 7 — Student operator
+- [x] `stainwars student add '<key>'` / `student remove`: menu-only SSH login (game commands, `htop`, `logs`)
+- [x] [student_access.md](student_access.md): beginner SSH guide for Windows and Mac
+- [ ] Test on a droplet: student add, menu commands, `htop`/`logs` + Ctrl+C, `ssh student@IP status`, shell escapes blocked, `student remove`
+- [ ] Walk the student through student_access.md on both a Windows and a Mac before game day
+- [ ] Check the school network allows outgoing SSH (port 22)
+
 ## Later (ideas, not started)
 - [ ] Minimap or compass, now that the map is bigger
 - [ ] Teach bots to use stairs (today they only wander up by accident)
