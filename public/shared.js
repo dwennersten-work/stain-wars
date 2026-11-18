@@ -93,6 +93,9 @@
     12: { name: 'Cranberry Blast', icon: '🍒', dmg: 11, color: 0xb0102a, speed: 34, life: 2.5, grav: 3, r: 0.35, noUpgrade: true },
     13: { name: 'Stuffing Rain',   icon: '🥖', dmg: 25, color: 0xc89b5a, speed: 25, life: 5, grav: 14, r: 0.4, splash: 3.5, noUpgrade: true },
     14: { name: 'Drumstick Stomp', icon: '🍗', dmg: 45, color: 0xa0522d, noUpgrade: true },
+    // Homing: launches at `launch` m/s, slows to `speed` (just under S.SPEED) over `slow` s, steers toward one player for
+    // `seek` s (no gravity), then drops to the ground. One touch stains you. Run right away and you barely escape.
+    15: { name: 'Pumpkin Seeker',  icon: '🎃', dmg: 999, color: 0xff7518, launch: 16, slow: 2, speed: 7.3, turn: 1.6, seek: 6, life: 9, grav: 12, r: 0.5, noUpgrade: true },
   };
   S.W = (w) => S.WEAPONS[w] || S.EXTRA[w];
   S.RUNOVER = 10; S.STOMP = 14;
@@ -136,8 +139,11 @@
 
   // ---------- Thanksgiving boss: Tom Gobbleton, a giant turkey ----------
   // HP scales with the class so it takes a few minutes of teamwork either way. Head hits do double damage.
-  S.BOSS = { name: 'Tom Gobbleton', r: 4, h: 10, headY: 8.6, headFwd: 2.6, headR: 1.7, roam: 30, speed: 3.5,
-    hpHuman: 4000, hpBot: 400, hpMin: 4000, stompR: 14, cashPer: 10 };
+  // size: model scale (the hitbox numbers below are already multiplied by it). hpHuman/hpBot: HP per player, so 4 students = 16000
+  // (tested as "just right"); HP is added when someone joins and taken away when they leave.
+  // seekR: the pumpkin seekers chase everyone this close, at seek speed (just under S.SPEED, so you can barely outrun them).
+  S.BOSS = { name: 'Tom Gobbleton', size: 1.5, r: 6, h: 15, headY: 12.9, headFwd: 3.9, headR: 2.55, roam: 30, speed: 4.5,
+    hpHuman: 4000, hpBot: 400, hpMin: 4000, stompR: 42, seekR: 45, cashPer: 10 };
   // Deterministic map so server and clients agree. A box is a solid block from height y up to top.
   function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
   const r = rng(1234);

@@ -174,10 +174,39 @@ module.exports = (X) => {
     adv(1000); stepBoss(TICK, now());
     check('the stomp hits people on the ground...', A1.p.hp < 100, `hp=${A1.p.hp.toFixed(0)}`);
     check('...but not people in the air', A2.p.hp === 100);
+    // Pumpkin seekers: standing still gets you stained, running away right away (and not stopping) just escapes.
+    const seekTest = (react) => {
+      projectiles.clear(); boss.x = boss.z = 0;
+      Object.assign(A1.p, { x: 12, y: 0, z: 0, hp: 100, dead: false }); Object.assign(A2.p, { x: -100, y: 0, z: 100, hp: 100, dead: false });
+      boss.seekAt = 0; boss.next = 0;
+      const rnd = Math.random; Math.random = () => 0; stepBoss(TICK, now()); Math.random = rnd;
+      boss.next = boss.seekAt = now() + 99999;
+      const n = [...projectiles.values()].filter(pr => pr.w === 15).length;
+      let minGap = 1e9;
+      for (let i = 0; i < 12 * 30 && projectiles.size && !A1.p.dead; i++) {
+        adv(1000 * TICK);
+        if (i >= react * 30) A1.p.x += S.SPEED * TICK;   // reacts after `react` seconds, then sprints straight away
+        stepProjectiles(TICK);
+        for (const pr of projectiles.values()) minGap = Math.min(minGap, Math.hypot(pr.x - A1.p.x, pr.y - A1.p.y - 1, pr.z - A1.p.z));
+      }
+      return { n, dead: A1.p.dead, minGap };
+    };
+    const still = seekTest(99);
+    check('pumpkin seekers fire at everyone nearby (not far players)', still.n === 1, `${still.n} seekers`);
+    check('standing still: the seeker stains you in one hit', still.dead);
+    const ran = seekTest(0.25);
+    check('running right away: you barely outrun it, then it falls', !ran.dead && projectiles.size === 0 && ran.minGap < 8, `closest ${ran.minGap.toFixed(1)}m`);
+    check('...but waiting 1.5s gets you stained', seekTest(1.5).dead);
+    A1.p.dead = false; A1.p.hp = 100;
+    // Leaving makes the turkey weaker (keeps the same fraction of HP left).
+    const L = client(60, 60), m1 = boss.max, f1 = boss.hp / boss.max;
+    X.playerLeft(L.p);
+    check('a player leaving makes the turkey weaker', boss.max === m1 - S.BOSS.hpHuman && Math.abs(boss.hp / boss.max - f1) < 1e-9, `${m1} -> ${boss.max} HP`);
+    const hpK = boss.hp, dmgK = A1.p.bossDmg;
     hurtBoss(A1.p, 0, 1e9, false);
     const R = session.results;
     check('staining it to 0 wins the game for everyone', session.phase === 'ended' && R.boss && R.boss.won && R.boss.top[0][0] === A1.p.name);
-    check('no credit for overkill', A1.p.bossDmg <= boss.max + 1e-6);
+    check('no credit for overkill', Math.abs(A1.p.bossDmg - dmgK - hpK) < 1e-6);
     check('the turkey is gone', !boss.on);
     // Time runs out = the turkey wins.
     startGame(0, 0, 1000); advance();

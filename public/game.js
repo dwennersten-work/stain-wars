@@ -435,8 +435,11 @@ const turkey = (function makeTurkey() {
     for (const a of [-0.5, 0, 0.5]) { const toe = add(G.cone, orange, Math.sin(a) * 0.6, -3.3, -Math.cos(a) * 0.6, 0.18, 1.2, 0.18, p); toe.rotation.set(-Math.PI / 2, 0, -a); }
     return p;
   });
+  g.scale.setScalar(S.BOSS.size);   // modeled at size 1; the server's hitbox numbers already include the scale
   g.visible = false; scene.add(g);
-  return { g, body, wings, neck, head, wattle, eyes, pupils, legs, target: new THREE.Vector3(), ry: 0, hp: 0, max: 1, stomp: 0, gobbleAt: 0, slamAt: 0 };
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 48), new THREE.MeshBasicMaterial({ color: 0xa0522d, transparent: true, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);   // the stomp's shockwave, out to S.BOSS.stompR
+  return { g, ring, body, wings, neck, head, wattle, eyes, pupils, legs, target: new THREE.Vector3(), ry: 0, hp: 0, max: 1, stomp: 0, gobbleAt: 0, slamAt: 0 };
 })();
 
 // ---------- Weapons: projectiles, viewmodels ----------
@@ -1130,6 +1133,7 @@ socket.on('boss', (m) => {
   const d = Math.hypot(turkey.g.position.x - me.x, turkey.g.position.z - me.z), v = Math.max(0.25, 1 - d / 150);
   if (m.a === 'stomp') { SFX.windup(); if (d < S.BOSS.stompR + 6) popup('🍗 STOMP INCOMING! JUMP! ⬆️', 900); }
   if (m.a === 'slam') { SFX.slam(v); turkey.slamAt = clock.elapsedTime; splat([turkey.g.position.x, 0, turkey.g.position.z], 11, true); }
+  if (m.a === 'seek') { SFX.gobble(v); turkey.gobbleAt = clock.elapsedTime; if (d < S.BOSS.seekR + 6) popup('🎃 PUMPKINS ARE CHASING YOU! RUN! 🏃', 1500); }
   if (m.a === 'gobble') { SFX.gobble(v); turkey.gobbleAt = clock.elapsedTime; }
 });
 socket.on('vboom', (m) => {
@@ -1146,6 +1150,12 @@ function enteredSeat() {
 }
 function leftSeat() { if (engine) { engine.stop(); engine = null; } pitch = 0; }
 socket.on('snap', (m) => {
+  // Homing shots: the server steers them, so take its position and velocity. One missing from the list has given up and falls.
+  if (m.s) {
+    const live = new Set();
+    for (const [id, x, y, z, vx, vy, vz] of m.s) { const s = shots.get(id); if (s) { live.add(id); s.m.position.set(x, y, z); s.v.set(vx, vy, vz); } }
+    for (const [id, s] of shots) if (S.W(s.w).seek && !live.has(id)) s.fall = true;
+  }
   const seen = new Set(), seated = new Map(), now = clock.elapsedTime;
   for (const [id, x, z, ry, vh, fuel, dead, speed, ...seats] of m.v) {
     const v = vehs.get(id);
@@ -1407,11 +1417,13 @@ function loop() {
     T.neck.rotation.x = gob ? Math.sin(t * 25) * 0.25 : Math.sin(t * 3) * 0.05;
     T.wattle.rotation.z = Math.sin(t * (gob ? 30 : 4)) * 0.4;
     T.pupils.forEach((p, i) => { p.position.x = T.eyes[i].position.x + Math.sin(t * 6 + i * 2) * 0.12; });
+    T.ring.visible = slam < 0.6;
+    if (T.ring.visible) { T.ring.position.set(T.g.position.x, 0.15, T.g.position.z); T.ring.scale.setScalar(Math.max(0.01, S.BOSS.stompR * Math.min(1, slam / 0.35))); T.ring.material.opacity = 1 - slam / 0.6; }
   }
   // projectiles (visual only; server decides hits)
   for (const [id, s] of shots) {
     const SW_ = S.W(s.w);
-    s.v.y -= SW_.grav * dt;
+    if (!SW_.seek || s.fall || s.t > SW_.seek) s.v.y -= SW_.grav * dt;
     s.m.position.addScaledVector(s.v, dt);
     if (s.w === 3 || s.w === 4 || s.w === 6 || s.w > 10) s.m.rotation.x += dt * 10;
     if ((s.t += dt) > SW_.life + 0.5) { scene.remove(s.m); shots.delete(id); }

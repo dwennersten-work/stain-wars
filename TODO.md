@@ -84,7 +84,8 @@
 - [x] Minimap, interaction prompts, touch buttons for all of it
 - [x] Tests: `tests/sim_features.js` (cars, ziplines, emotes, boss) and map checks (cables clear, landing spots, gas lanes)
 - [ ] Install on a second droplet and play it with a few people before game day
-- [ ] Playtest: turkey HP per student (4,000), attack rate, stomp radius; car speeds, fuel burn, run-over damage
+- [x] Turkey v2: 1.5× size, 42m stomp, pumpkin seekers (homing, barely outrunnable), more aggressive, HP shrinks when players leave
+- [ ] Playtest: turkey v2 (seeker speed 7.3 vs run 8, stomp 42m may be too often); car speeds, fuel burn, run-over damage
 - [ ] Check frame rate on school laptops with the bigger town (3,262 boxes, still one draw call)
 - [ ] Check speech synthesis ("six seven") on Chromebooks and iPhone Safari
 - [ ] Maybe: bots that drive, gas cans, seat switching, turkey that leaves the square

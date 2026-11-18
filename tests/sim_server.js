@@ -7,7 +7,7 @@ let fake = 1e12; const realNow = Date.now; Date.now = () => fake;
 let src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
 src = src.replace(/setInterval\(\(\) => console\.log[^\n]*\n/, '');
 src += `\nmodule.exports = { players, projectiles, newPlayer, clientMove, damage, buyTray, buyUpgrade, buyWeapon, equip, fire, stepProjectiles, stepBot, addBot, endProjectile, trayUp, S, io, server,
-  vehicles, enterVehicle, leaveVehicle, driveInput, stepVehicles, hitVehicle, resetVehicle, zipToggle, stepZip, emote, startGame, advance, stepBoss, hurtBoss, boss, session, freePlay, respawn };\n`;
+  vehicles, enterVehicle, leaveVehicle, driveInput, stepVehicles, hitVehicle, resetVehicle, zipToggle, stepZip, emote, startGame, advance, stepBoss, hurtBoss, boss, session, freePlay, respawn, playerLeft };\n`;
 const m = new Module(path.join(ROOT, 'server.js')); m.filename = path.join(ROOT, 'server.js'); m.paths = Module._nodeModulePaths(ROOT);
 m._compile(src, m.filename);
 const { players, projectiles, newPlayer, clientMove, damage, buyTray, buyUpgrade, equip, fire, stepProjectiles, addBot, trayUp, S, io, server } = m.exports;

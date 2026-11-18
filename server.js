@@ -115,6 +115,15 @@ function newPlayer(bot, socket) {
   return p;
 }
 
+function playerLeft(p) {
+  leaveVehicle(p, false);
+  players.delete(p.id);
+  if (boss.on && boss.max > S.BOSS.hpMin) {   // fewer players, weaker turkey (keeps the same fraction of HP left)
+    const max = Math.max(S.BOSS.hpMin, boss.max - (p.bot ? S.BOSS.hpBot : S.BOSS.hpHuman));
+    boss.hp = Math.max(1, boss.hp * max / boss.max); boss.max = max;
+  }
+}
+
 function respawn(p) {
   leaveVehicle(p, false); p.zip = null; p.emote = 0;
   Object.assign(p, spawnSpot(), { vy: 0, hp: S.MAX_HP, dead: false });
@@ -576,23 +585,25 @@ function sendBoard() {
 // ---------- Thanksgiving boss: Tom Gobbleton ----------
 // A giant turkey that roams the Town Square. Everyone is on the same side (no friendly fire), and the class must
 // stain it before the clock runs out. Its attacks: lobbed gravy bombs, cranberry blasts, stuffing rain on far-away
-// players (roof campers too), and a drumstick stomp that hits everyone on the ground nearby (jump to dodge it).
-const boss = { on: false, x: 0, z: 0, ry: 0, hp: 0, max: 0, next: 0, stompAt: 0, target: 0, retarget: 0, startedAt: 0 };
+// players (roof campers too), a drumstick stomp that hits everyone on the ground nearby (jump to dodge it), and
+// pumpkin seekers: slow homing shots, one per nearby player, that stain in one touch (run right away to outrun them).
+const boss = { on: false, x: 0, z: 0, ry: 0, hp: 0, max: 0, next: 0, stompAt: 0, seekAt: 0, target: 0, retarget: 0, startedAt: 0 };
 const bossFwd = () => [-Math.sin(boss.ry), -Math.cos(boss.ry)];
+const bossBodyY = (y) => Math.max(2.5 * S.BOSS.size, Math.min(6 * S.BOSS.size, y));   // nearest point on the body's axis
 const bossHead = () => { const f = bossFwd(); return [boss.x + f[0] * S.BOSS.headFwd, S.BOSS.headY, boss.z + f[1] * S.BOSS.headFwd]; };
 
 // 2 = head (double damage), 1 = body, 0 = miss. The body is a fat vertical capsule.
 function bossHit(x, y, z, pad) {
   const h = bossHead();
   if (Math.hypot(x - h[0], y - h[1], z - h[2]) < S.BOSS.headR + pad) return 2;
-  return Math.hypot(x - boss.x, y - Math.max(2.5, Math.min(6, y)), z - boss.z) < S.BOSS.r + pad ? 1 : 0;
+  return Math.hypot(x - boss.x, y - bossBodyY(y), z - boss.z) < S.BOSS.r + pad ? 1 : 0;
 }
 
 function startBoss() {
   for (const p of players.values()) Object.assign(p, { team: 0, scale: 1, teamPts: 0, bossDmg: 0, bossPaid: 0 });
   projectiles.clear();
   const all = [...players.values()], humans = all.filter(p => !p.bot).length;
-  Object.assign(boss, { on: true, x: 0, z: 0, ry: 0, next: Date.now() + 5000, stompAt: 0, target: 0, retarget: 0, startedAt: Date.now() });
+  Object.assign(boss, { on: true, x: 0, z: 0, ry: 0, next: Date.now() + 5000, stompAt: 0, seekAt: Date.now() + 8000, target: 0, retarget: 0, startedAt: Date.now() });
   boss.max = boss.hp = Math.max(S.BOSS.hpMin, S.BOSS.hpHuman * humans + S.BOSS.hpBot * (all.length - humans));
   setPhase('boss', session.bossMs);
   for (const p of players.values()) respawn(p);   // after setPhase, so everyone spawns away from the turkey
@@ -611,8 +622,8 @@ function hurtBoss(a, w, amt, head) {
   if (boss.hp <= 0) endGame();
 }
 
-function bossShot(w, v) {
-  const h = bossHead(), pr = { id: nextId++, w, owner: BOSS_ID, x: h[0], y: h[1] - 0.6, z: h[2], vx: v[0], vy: v[1], vz: v[2], t: 0 };
+function bossShot(w, v, home = 0) {
+  const h = bossHead(), pr = { id: nextId++, w, owner: BOSS_ID, x: h[0], y: h[1] - 0.6, z: h[2], vx: v[0], vy: v[1], vz: v[2], t: 0, home };
   projectiles.set(pr.id, pr);
   io.emit('shot', { id: pr.id, w, o: [pr.x, pr.y, pr.z], v });
 }
@@ -629,7 +640,7 @@ function stepBoss(dt, now) {
   if (!boss.on) return;
   const B = S.BOSS, alive = [...players.values()].filter(p => !p.dead), flat = (p) => Math.hypot(p.x - boss.x, p.z - boss.z);
   if (now >= boss.retarget || !players.has(boss.target)) {   // chase the nearest student (bots count as farther away)
-    boss.retarget = now + 3000;
+    boss.retarget = now + 2000;
     let best = null, bd = 160;
     for (const p of alive) { const d = flat(p) * (p.bot ? 1.5 : 1); if (d < bd) { bd = d; best = p; } }
     boss.target = best ? best.id : 0;
@@ -639,8 +650,8 @@ function stepBoss(dt, now) {
     const dx = t.x - boss.x, dz = t.z - boss.z, d = Math.hypot(dx, dz);
     let turn = Math.atan2(-dx, -dz) - boss.ry;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-    boss.ry += Math.max(-2 * dt, Math.min(2 * dt, turn));
-    if (d > 9) {
+    boss.ry += Math.max(-2.5 * dt, Math.min(2.5 * dt, turn));
+    if (d > 9 * B.size) {
       boss.x = Math.max(-B.roam, Math.min(B.roam, boss.x + dx / d * B.speed * dt));
       boss.z = Math.max(-B.roam, Math.min(B.roam, boss.z + dz / d * B.speed * dt));
     }
@@ -652,8 +663,19 @@ function stepBoss(dt, now) {
   }
   if (now < boss.next || boss.stompAt || !boss.on) return;
   const rage = boss.hp < boss.max / 2 ? 0.65 : 1;   // angrier (faster) at half health
-  boss.next = now + (1300 + Math.random() * 1100) * rage;
-  if (alive.some(p => flat(p) < B.stompR && p.y < 3) && Math.random() < 0.6) {
+  boss.next = now + (900 + Math.random() * 800) * rage;
+  const near = alive.filter(p => flat(p) < B.seekR);
+  if (near.length && now >= boss.seekAt && Math.random() < 0.35) {   // pumpkin seekers: one per nearby player
+    boss.seekAt = now + 7000 * rage; boss.next = now + 2500 * rage;
+    io.emit('boss', { a: 'seek' });
+    const W = S.EXTRA[15], h = bossHead();
+    for (const p of near.slice(0, 20)) {
+      const dx = p.x - h[0], dy = p.y + 1 - h[1], dz = p.z - h[2], l = Math.hypot(dx, dy, dz) || 1;
+      bossShot(15, [dx / l * W.launch, dy / l * W.launch, dz / l * W.launch], p.id);
+    }
+    return;
+  }
+  if (alive.some(p => flat(p) < B.stompR && p.y < 3) && Math.random() < 0.4) {
     boss.stompAt = now + 900; boss.next = now + 2600 * rage;
     return io.emit('boss', { a: 'stomp' });
   }
@@ -663,7 +685,7 @@ function stepBoss(dt, now) {
   if (roll < 0.25) for (const p of inRange.sort(() => Math.random() - 0.5).slice(0, 6)) lob(13, p, 3);
   else if (roll < 0.6 && t && !t.dead && flat(t) < 60) {
     const h = bossHead(), W = S.EXTRA[12], dx = t.x - h[0], dy = t.y + 1.2 - h[1], dz = t.z - h[2], l = Math.hypot(dx, dy, dz), T = l / W.speed;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 7; i++) {
       const s = () => (Math.random() - 0.5) * 0.16;
       bossShot(12, [(dx / l + s()) * W.speed, (dy / l + s()) * W.speed + 0.5 * W.grav * T, (dz / l + s()) * W.speed]);
     }
@@ -795,7 +817,7 @@ function endProjectile(pr, hitPlayer, hit) {
       if (d < W.splash) hitVehicle(v, owner, W.dmg * (1 - d / W.splash * 0.7), pr.w);
     }
     if (boss.on && owner && pr.owner !== BOSS_ID) {
-      const d = Math.max(0, Math.hypot(pr.x - boss.x, pr.y - Math.max(2.5, Math.min(6, pr.y)), pr.z - boss.z) - S.BOSS.r);
+      const d = Math.max(0, Math.hypot(pr.x - boss.x, pr.y - bossBodyY(pr.y), pr.z - boss.z) - S.BOSS.r);
       if (d < W.splash) hurtBoss(owner, pr.w, W.dmg * (1 - d / W.splash * 0.7), false);
     }
   } else if (hit && hit.boss) hurtBoss(owner, pr.w, W.dmg, hit.boss === 2);
@@ -807,12 +829,25 @@ function endProjectile(pr, hitPlayer, hit) {
   io.emit('pop', { id: pr.id, w: pr.w, p: [+pr.x.toFixed(2), +Math.max(0, pr.y).toFixed(2), +pr.z.toFixed(2)] });
 }
 
+// Homing (the turkey's pumpkin seekers): turn toward the target's chest at most W.turn rad/s, at a fixed speed.
+// If the target is stained or gone, the seeker gives up and falls.
+function steer(pr, W, dt) {
+  const p = players.get(pr.home);
+  if (!p || p.dead) { pr.home = 0; return; }
+  const dx = p.x - pr.x, dy = p.y + 1 - pr.y, dz = p.z - pr.z, l = Math.hypot(dx, dy, dz) || 1;
+  const sp = Math.hypot(pr.vx, pr.vy, pr.vz) || 1, cx = pr.vx / sp, cy = pr.vy / sp, cz = pr.vz / sp;
+  const ang = Math.acos(Math.max(-1, Math.min(1, (cx * dx + cy * dy + cz * dz) / l))), k = ang > 1e-6 ? Math.min(1, W.turn * dt / ang) : 1;
+  const nx = cx + (dx / l - cx) * k, ny = cy + (dy / l - cy) * k, nz = cz + (dz / l - cz) * k, n = Math.hypot(nx, ny, nz) || 1;
+  const v = W.speed + (W.launch - W.speed) * Math.max(0, 1 - pr.t / W.slow);   // a fast launch that slows to just under run speed
+  pr.vx = nx / n * v; pr.vy = ny / n * v; pr.vz = nz / n * v;
+}
+
 function stepProjectiles(dt) {
   for (const pr of projectiles.values()) {
     const W = S.W(pr.w);
-    const steps = Math.ceil(Math.max(W.speed, Math.hypot(pr.vx, pr.vy, pr.vz)) * dt / 0.4), sdt = dt / steps, owner = players.get(pr.owner);
+    const steps = Math.ceil(Math.max(W.launch || W.speed, Math.hypot(pr.vx, pr.vy, pr.vz)) * dt / 0.4), sdt = dt / steps, owner = players.get(pr.owner);
     outer: for (let i = 0; i < steps; i++) {
-      pr.vy -= W.grav * sdt;
+      if (pr.home && pr.t < W.seek) steer(pr, W, sdt); else pr.vy -= W.grav * sdt;
       pr.x += pr.vx * sdt; pr.y += pr.vy * sdt; pr.z += pr.vz * sdt; pr.t += sdt;
       // Cars are cover: check them before the riders sticking out of them.
       for (const v of vehicles) if (vehicleTarget(v, pr, owner) && inVehicle(v, pr.x, pr.y, pr.z, W.r)) { endProjectile(pr, null, { veh: v }); break outer; }
@@ -893,8 +928,7 @@ io.on('connection', (socket) => {
   socket.on('zip', () => zipToggle(p));
   socket.on('emote', (n) => { if (Number.isInteger(n) && n >= -1 && n < S.EMOTES.length) emote(p, n); });
   socket.on('disconnect', () => {
-    leaveVehicle(p, false);
-    players.delete(p.id);
+    playerLeft(p);
     const n = ipCount.get(ip) - 1;
     if (n > 0) ipCount.set(ip, n); else ipCount.delete(ip);
   });
@@ -923,6 +957,7 @@ setInterval(() => {
       p: [...players.values()].map(p => [p.id, r(p.x), r(p.y), r(p.z), r(p.ry), p.tier, Math.ceil(p.hp), p.dead ? 1 : 0, trayUp(p, now) ? 1 : 0, p.emote, p.zip ? 1 : 0]),
       v: vehicles.map(v => [v.id, r(v.x), r(v.z), r(v.ry), Math.ceil(v.hp), Math.ceil(v.fuel), v.dead ? 1 : 0, r(v.speed), ...v.seats]),
       b: boss.on ? [r(boss.x), r(boss.z), r(boss.ry), Math.ceil(boss.hp), boss.max, boss.stompAt ? 1 : 0] : null,
+      s: boss.on ? [...projectiles.values()].filter(pr => pr.home).map(pr => [pr.id, r(pr.x), r(pr.y), r(pr.z), r(pr.vx), r(pr.vy), r(pr.vz)]) : null,   // homing shots' course
     });
   }
   if (tickN % 30 === 0) for (const p of players.values()) p.msgs = 0;   // per-second message budget
